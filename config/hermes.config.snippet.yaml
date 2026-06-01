@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Recommended Hermes config for projects using this scaffold.
+#
+# Hermes config is GLOBAL (~/.hermes/config.yaml), not per-repo. bootstrap.sh
+# applies these values via `hermes config set ...` (and writes external_dirs
+# directly). This file is the reference for what the scaffold expects.
+#
+# DeepSeek = built-in `deepseek` provider. KEY MUST be in ~/.hermes/.env as
+# DEEPSEEK_API_KEY (this provider reads the env var ONLY; api_key in config.yaml
+# is ignored). Confirm provider/model with `hermes setup` (pick DeepSeek) / `hermes model`.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# --- Provider / model (provider = DeepSeek) ---
+# Reference values. The `hermes setup` wizard (choose DeepSeek) writes the
+# version-correct shape; base_url default is https://api.deepseek.com.
+model: deepseek/deepseek-v4-pro    # confirm with `hermes model`; alts: deepseek-chat, deepseek-reasoner
+
+# --- Execution backend (Phase 0: local during development) ---
+terminal:
+  backend: local                   # local during dev; Dockerfile is for later deployment
+  cwd: "."
+  timeout: 180
+
+# --- Iteration budget & reasoning ---
+agent:
+  max_turns: 90                    # raise for very long orchestration sessions
+  reasoning_effort: ""             # "" = medium. Use "high" for planning-heavy work.
+
+# --- Safety posture (forward-leaning) ---
+approvals:
+  mode: manual                     # manual | smart | off. Start manual.
+security:
+  redact_secrets: true
+  tirith_enabled: true             # scan terminal commands before execution
+checkpoints:
+  enabled: true                    # snapshots before destructive file ops
+  max_snapshots: 50
+code_execution:
+  mode: project
+
+# --- Memory ---
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+
+# --- Subagent delegation (optional; Phase 4) ---
+# Defaults are sensible. Subagents inherit provider+key. Uncomment to tune.
+# delegation:
+#   max_concurrent_children: 3     # parallel children per batch (floor 1, no hard ceiling)
+#   max_iterations: 50             # max turns per child
+#   max_spawn_depth: 1             # 1 = flat; 2 lets orchestrator children spawn leaves
+#   # model: "deepseek/deepseek-chat"   # route children to a cheaper model while parent runs v4-pro/reasoner
+
+# --- Parallel agents on one repo (optional; Phase 4) ---
+# Prefer the per-session `hermes -w` flag over enabling globally.
+# .worktreeinclude lists gitignored files to copy into each worktree.
+# worktree: true
+
+# --- Project skills via external_dirs (set automatically by bootstrap.sh) ---
+# The repo's absolute skills/ path is added here so skills are discovered live
+# from the repo (no copy => no drift). External-dir skills are outside the
+# Curator's jurisdiction, so they need no pinning.
+# skills:
+#   external_dirs:
+#     - /abs/path/to/this-repo/skills

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-commit gate: block obvious secrets and run scaffold validation.
+# Install with: make install-hooks
+set -uo pipefail
+
+# 1) Block committing a real .env or anything that looks like a key.
+if git diff --cached --name-only | grep -qx ".env"; then
+  echo "✗ refusing to commit .env (secrets). Unstage it."; exit 1
+fi
+if git diff --cached -U0 | grep -E '^\+' | grep -Eq 'sk-ant-[A-Za-z0-9]|ANTHROPIC_API_KEY=[A-Za-z0-9]'; then
+  echo "✗ a staged line looks like a live API key. Remove it before committing."; exit 1
+fi
+
+# 2) Run scaffold validation (skip if script absent).
+if [ -x scripts/validate.sh ]; then
+  scripts/validate.sh >/dev/null || { echo "✗ scripts/validate.sh failed — run it to see details."; exit 1; }
+fi
+echo "✓ pre-commit checks passed"

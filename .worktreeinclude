@@ -1,0 +1,5 @@
+# Gitignored files to copy into each parallel worktree Hermes creates.
+# Keeps secrets/deps available when agents run in isolated worktrees.
+.env
+.venv/
+node_modules/

@@ -1,0 +1,16 @@
+# Secrets
+.env
+*.env.local
+
+# Hermes parallel worktrees
+.worktrees/
+
+# Python / Node noise (language-agnostic scaffold; trim to taste)
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# OS / editor
+.DS_Store
+*.swp
