@@ -1,44 +1,166 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import mermaid from "mermaid";
+import "katex/dist/katex.min.css";
 import type { Message } from "../types";
+import logoImg from "/logo.png";
 
-function CopyButton({ text }: { text: string }) {
-  const copy = async () => {
-    await navigator.clipboard.writeText(text);
+mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: { darkMode: true, background: "#1c1c1f", primaryColor: "#5b7cff" } });
+
+/* ── Mermaid diagram block ───────────────────── */
+
+function MermaidBlock({ code }: { code: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState("");
+  const id = useRef(`mermaid-${Math.random().toString(36).slice(2)}`);
+
+  useEffect(() => {
+    mermaid.render(id.current, code).then(({ svg: s }) => setSvg(s)).catch(() => setSvg("<p style='color:#f87171'>图表渲染失败</p>"));
+  }, [code]);
+
+  return <div ref={ref} className="mermaid-block" dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+/* ── Code block with copy button ──────────────── */
+
+function CodeBlock({ children, className }: { children: ReactNode; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const codeText = typeof children === "string" ? children : "";
+  const language = className?.replace("language-", "") || "";
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(codeText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
+
+  if (language === "mermaid") {
+    return <MermaidBlock code={codeText} />;
+  }
+
   return (
-    <button className="msg-copy" onClick={copy} title="Copy">
-      📋
-    </button>
+    <div className="code-block-wrapper">
+      {language && <span className="code-lang">{language}</span>}
+      <button className="code-copy-btn" onClick={handleCopy}>
+        {copied ? "✓ 已复制" : "📋 复制"}
+      </button>
+      <pre className={className}>
+        <code className={className}>{children}</code>
+      </pre>
+    </div>
   );
 }
 
-export function ChatMessage({ message }: { message: Message }) {
+/* ── Chat Message ─────────────────────────────── */
+
+function ChatMessage({
+  message,
+  onEdit,
+  onRegenerateMsg,
+  streaming,
+  userAvatar,
+}: {
+  message: Message;
+  onEdit?: (text: string) => void;
+  onRegenerateMsg?: (messageId: string) => void;
+  streaming: boolean;
+  userAvatar: string | null;
+}) {
   const isUser = message.role === "user";
   const isEmpty = message.content.trim().length === 0;
 
   return (
     <div className={`msg ${isUser ? "msg-user" : "msg-assistant"}`}>
-      <div className="msg-role">{isUser ? "You" : "AI"}</div>
-      <div className="msg-content">
+      <div className="msg-avatar">
         {isUser ? (
-          <p>{message.content}</p>
-        ) : isEmpty ? (
-          <span className="msg-typing">Thinking…</span>
+          userAvatar ? (
+            <img className="msg-avatar-img" src={userAvatar} alt="用户" />
+          ) : (
+            "👤"
+          )
         ) : (
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <img className="msg-avatar-img" src={logoImg} alt="AI" />
         )}
       </div>
-      {!isUser && !isEmpty && <CopyButton text={message.content} />}
+      <div className="msg-body">
+        <div className="msg-content">
+          {!isUser && message.reasoning && (
+            <details className="reasoning-block">
+              <summary className="reasoning-summary">💭 思考过程</summary>
+              <div className="reasoning-content">{message.reasoning}</div>
+            </details>
+          )}
+          {isUser ? (
+            <p>{message.content}</p>
+          ) : isEmpty ? (
+            <span className="msg-typing">正在思考…</span>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+              components={{
+                pre: ({ children }) => <>{children}</>,
+                code: ({ className, children, ...props }) => {
+                  const isInline = !className;
+                  if (isInline) {
+                    return <code className={className} {...props}>{children}</code>;
+                  }
+                  return <CodeBlock className={className}>{children}</CodeBlock>;
+                },
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
+        </div>
+        {!isEmpty && (
+          <div className="msg-actions">
+            {isUser ? (
+              <>
+                <button className="msg-action" onClick={() => navigator.clipboard.writeText(message.content)} title="复制">
+                  📋 复制
+                </button>
+                <button className="msg-action" onClick={() => onEdit?.(message.content)} title="重新编辑">
+                  ✏️ 编辑
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="msg-action" onClick={() => navigator.clipboard.writeText(message.content)} title="复制">
+                  📋 复制
+                </button>
+                <button className="msg-action" onClick={() => onRegenerateMsg?.(message.id)} disabled={streaming} title="重新生成">
+                  🔄 重新生成
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+/* ── Chat Messages Container ──────────────────── */
+
 export function ChatMessages({
   messages,
+  streaming,
+  onEditMessage,
+  onRegenerateMessage,
+  userAvatar,
+  onClearChat,
+  onForkChat,
 }: {
   messages: Message[];
   streaming: boolean;
+  onEditMessage: (text: string) => void;
+  onRegenerateMessage: (messageId: string) => void;
+  userAvatar: string | null;
+  onClearChat: () => void;
+  onForkChat: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -48,13 +170,21 @@ export function ChatMessages({
 
   return (
     <div className="chat-messages">
-      {messages.length === 0 && (
-        <div className="chat-empty">
-          Send a message to start the conversation.
+      {messages.length > 0 && (
+        <div className="chat-title-bar">
+          <button className="btn-regenerate" onClick={onForkChat}>⑂ 分叉</button>
+          <button className="btn-regenerate" onClick={onClearChat}>🗑 清空</button>
         </div>
       )}
       {messages.map((m) => (
-        <ChatMessage key={m.id} message={m} />
+        <ChatMessage
+          key={m.id}
+          message={m}
+          onEdit={onEditMessage}
+          onRegenerateMsg={onRegenerateMessage}
+          streaming={streaming}
+          userAvatar={userAvatar}
+        />
       ))}
       <div ref={bottomRef} />
     </div>

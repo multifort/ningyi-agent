@@ -33,3 +33,9 @@ Run through every item. If one fails, the change is NOT done.
 ## Verification
 - Every checklist item above is explicitly confirmed in the task summary, with the
   test command output referenced.
+- For this project, completed phases must be reported to Feishu via
+  `send_message(target="feishu:oc_ec652a7140854eb6ef28e13ff478cb07")`.
+
+## References
+- `references/express5-sse-quirks.md` — Express 5 SSE streaming pitfalls and fixes
+- `references/vite-cors-theming.md` — Vite host binding, CORS, and CSS theming patterns

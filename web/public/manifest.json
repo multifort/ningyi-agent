@@ -1,0 +1,13 @@
+{
+  "name": "宁翼智能助手",
+  "short_name": "宁翼助手",
+  "description": "您的智能生活管家，随时为您服务",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#4d6bfe",
+  "icons": [
+    { "src": "/logo.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
