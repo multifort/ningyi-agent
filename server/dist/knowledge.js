@@ -6,21 +6,10 @@ import { randomUUID } from "node:crypto";
 import multer from "multer";
 import db from "./db.js";
 import { authMiddleware } from "./middleware/auth.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, unlink } from "node:fs";
 const upload = multer({ dest: "data/uploads/", limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 router.use(authMiddleware);
-// Ensure knowledge_base table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS knowledge_base (
-    id       TEXT PRIMARY KEY,
-    user_id  INTEGER NOT NULL,
-    name     TEXT NOT NULL,
-    content  TEXT NOT NULL,
-    created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-`);
 // Upload document
 router.post("/knowledge", upload.single("file"), (req, res) => {
     const file = req.file;
@@ -34,6 +23,10 @@ router.post("/knowledge", upload.single("file"), (req, res) => {
     }
     catch {
         content = "[无法读取的文件]";
+    }
+    finally {
+        // Remove the temp file immediately after reading — content is stored in DB
+        unlink(file.path, () => { });
     }
     const id = randomUUID();
     db.prepare("INSERT INTO knowledge_base (id, user_id, name, content) VALUES (?,?,?,?)")

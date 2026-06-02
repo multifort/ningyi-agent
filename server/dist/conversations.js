@@ -105,19 +105,27 @@ router.get("/conversations/search", (req, res) => {
         res.json({ results: [] });
         return;
     }
-    const rows = db
-        .prepare(`SELECT DISTINCT c.id, c.title, c.updated_at,
-        (SELECT content FROM messages WHERE conversation_id = c.id AND content LIKE ? LIMIT 1) as snippet
-       FROM conversations c
-       JOIN messages m ON m.conversation_id = c.id
-       WHERE c.user_id = ? AND (c.title LIKE ? OR m.content LIKE ?)
-       ORDER BY c.updated_at DESC LIMIT 20`)
-        .all(`%${q}%`, req.userId, `%${q}%`, `%${q}%`);
+    // FTS5 query: wrap in quotes to treat as phrase, append * for prefix match
+    const ftsQuery = `"${q.replace(/"/g, '""')}"*`;
+    // FTS5 hit on message content, joined to owning conversation
+    const ftsRows = db.prepare(`SELECT DISTINCT c.id, c.title, c.updated_at,
+       snippet(messages_fts, 0, '', '', '…', 20) as snippet
+     FROM messages_fts
+     JOIN messages m ON m.rowid = messages_fts.rowid
+     JOIN conversations c ON c.id = m.conversation_id
+     WHERE messages_fts MATCH ? AND c.user_id = ?
+     ORDER BY c.updated_at DESC LIMIT 20`).all(ftsQuery, req.userId);
+    // Also match conversation titles (not in FTS, small table — LIKE is fine)
+    const titleRows = db.prepare(`SELECT id, title, updated_at, NULL as snippet
+     FROM conversations
+     WHERE user_id = ? AND title LIKE ? AND id NOT IN (${ftsRows.map(() => "?").join(",") || "''"})
+     ORDER BY updated_at DESC LIMIT 10`).all(req.userId, `%${q}%`, ...ftsRows.map((r) => r.id));
+    const results = [...ftsRows, ...titleRows].slice(0, 20);
     res.json({
-        results: rows.map((r) => ({
+        results: results.map((r) => ({
             conversationId: r.id,
             title: r.title,
-            snippet: r.snippet?.slice(0, 200),
+            snippet: r.snippet?.slice(0, 200) ?? null,
             updatedAt: r.updated_at,
         })),
     });

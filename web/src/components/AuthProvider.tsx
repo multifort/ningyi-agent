@@ -24,6 +24,7 @@ interface AuthState {
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (u: User) => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -99,10 +100,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    // Notify server to blacklist the current token (best-effort)
+    const t = localStorage.getItem(TOKEN_KEY);
+    if (t) {
+      fetch(`${API}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${t}` },
+      }).catch(() => {});
+    }
     localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
   }, []);
+
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      const t = localStorage.getItem(TOKEN_KEY);
+      const data = await fetchApi(
+        "/auth/password",
+        {
+          method: "PUT",
+          body: JSON.stringify({ currentPassword, newPassword }),
+        },
+        t,
+      );
+      // Server issues a fresh token after password change
+      localStorage.setItem(TOKEN_KEY, data.token);
+      setToken(data.token);
+    },
+    [],
+  );
 
   const updateUser = useCallback((u: User) => {
     setUser(u);
@@ -110,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, register, logout, updateUser }}
+      value={{ user, token, loading, login, register, logout, updateUser, changePassword }}
     >
       {children}
     </AuthContext.Provider>

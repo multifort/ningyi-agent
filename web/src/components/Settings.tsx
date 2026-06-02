@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useAuth } from "./AuthProvider";
 
 export interface SettingsData {
   avatar: string | null;
@@ -19,6 +20,7 @@ const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const AVATAR_SIZE = 128;
 
 export function Settings({ settings, onSave, onClose }: SettingsProps) {
+  const { changePassword } = useAuth();
   const [avatar, setAvatar] = useState<string | null>(settings.avatar);
   const [displayName, setDisplayName] = useState(settings.displayName);
   const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt || "");
@@ -26,6 +28,15 @@ export function Settings({ settings, onSave, onClose }: SettingsProps) {
   const [error, setError] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Password change state
+  const [showPwSection, setShowPwSection] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [pwSuccess, setPwSuccess] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,6 +82,35 @@ export function Settings({ settings, onSave, onClose }: SettingsProps) {
       fontSize: settings.fontSize || 16,
     });
     onClose();
+  };
+
+  const handleChangePassword = async () => {
+    setPwError("");
+    setPwSuccess("");
+    if (!currentPw || !newPw || !confirmPw) {
+      setPwError("请填写所有密码字段");
+      return;
+    }
+    if (newPw.length < 6) {
+      setPwError("新密码至少6位");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      setPwError("两次输入的新密码不一致");
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await changePassword(currentPw, newPw);
+      setPwSuccess("密码修改成功，已自动更新登录状态");
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+    } catch (e) {
+      setPwError(e instanceof Error ? e.message : "修改失败");
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   return (
@@ -145,6 +185,33 @@ export function Settings({ settings, onSave, onClose }: SettingsProps) {
           <span className="settings-hint">
             留空则使用系统默认 Key。密钥仅保存在本地浏览器。
           </span>
+        </div>
+
+        {/* Change Password */}
+        <div className="settings-section">
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <label className="settings-label" style={{ margin: 0 }}>修改密码</label>
+            <button className="btn-settings" style={{ fontSize: "0.8rem", padding: "2px 10px" }}
+              onClick={() => { setShowPwSection(!showPwSection); setPwError(""); setPwSuccess(""); }}>
+              {showPwSection ? "收起" : "展开"}
+            </button>
+          </div>
+          {showPwSection && (
+            <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <input className="settings-input" type="password" value={currentPw}
+                onChange={(e) => setCurrentPw(e.target.value)} placeholder="当前密码" />
+              <input className="settings-input" type="password" value={newPw}
+                onChange={(e) => setNewPw(e.target.value)} placeholder="新密码（至少6位）" />
+              <input className="settings-input" type="password" value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)} placeholder="确认新密码" />
+              {pwError && <div className="settings-error">{pwError}</div>}
+              {pwSuccess && <div style={{ color: "var(--color-success, #22c55e)", fontSize: "0.85rem" }}>{pwSuccess}</div>}
+              <button className="btn-settings-primary" onClick={handleChangePassword} disabled={pwLoading}
+                style={{ alignSelf: "flex-start" }}>
+                {pwLoading ? "修改中…" : "确认修改"}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="settings-footer">

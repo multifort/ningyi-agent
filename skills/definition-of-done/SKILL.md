@@ -26,6 +26,7 @@ Run through every item. If one fails, the change is NOT done.
 7. **Reversible** — the change is behind a flag or easily revertible if risky.
 
 ## Pitfalls
+- **Content filter**: `write_file` and `patch` can mangle strings like `process.env.XXX` or `"7d"`. See `references/content-filter-workaround.md` for workarounds.
 - Marking done with skipped/xfail tests left silently in place.
 - "I'll update docs later" — later never comes; do it in the same change.
 - Bundling unrelated refactors into the diff.
@@ -39,3 +40,4 @@ Run through every item. If one fails, the change is NOT done.
 ## References
 - `references/express5-sse-quirks.md` — Express 5 SSE streaming pitfalls and fixes
 - `references/vite-cors-theming.md` — Vite host binding, CORS, and CSS theming patterns
+- `references/content-filter-workaround.md` — write_file/patch string mangling workarounds

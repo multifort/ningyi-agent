@@ -22,6 +22,38 @@ import { authMiddleware } from "./middleware/auth.js";
 const PORT = parseInt(process.env.PORT ?? "8787", 10);
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173").split(",");
 
+// ── Rate limiter (in-memory, no external dep) ───
+// Allows up to MAX_HITS requests per window per IP, then returns 429.
+function makeRateLimiter(maxHits: number, windowMs: number) {
+  const counters = new Map<string, { count: number; resetAt: number }>();
+  // Periodically sweep expired entries to prevent unbounded growth
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of counters) {
+      if (now >= entry.resetAt) counters.delete(key);
+    }
+  }, windowMs).unref();
+
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ?? req.socket.remoteAddress ?? "unknown";
+    const now = Date.now();
+    const entry = counters.get(ip);
+    if (!entry || now >= entry.resetAt) {
+      counters.set(ip, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    entry.count++;
+    if (entry.count > maxHits) {
+      res.status(429).json({ message: "请求过于频繁，请稍后再试" });
+      return;
+    }
+    next();
+  };
+}
+
+// 10 attempts per 15 minutes per IP on auth endpoints
+const authRateLimiter = makeRateLimiter(10, 15 * 60 * 1000);
+
 const app = express();
 
 app.use(
@@ -65,7 +97,9 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
-// Auth routes (no middleware needed)
+// Auth routes — rate-limited to block brute-force
+app.use("/api/auth/login", authRateLimiter);
+app.use("/api/auth/register", authRateLimiter);
 app.use("/api", authRoutes);
 
 // ── Protected routes ────────────────────────────

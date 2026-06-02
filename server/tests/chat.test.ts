@@ -13,6 +13,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
 import request from "supertest";
 import { handleChat, validateRequest } from "../src/chat.js";
+import db from "../src/db.js";
+import type { AuthRequest } from "../src/middleware/auth.js";
 
 // ---------------------------------------------------------------------------
 // Unit: validateRequest
@@ -30,7 +32,7 @@ describe("validateRequest", () => {
   });
 
   it("rejects too many messages", () => {
-    const messages = Array.from({ length: 101 }, (_, i) => ({
+    const messages = Array.from({ length: 201 }, (_, i) => ({
       role: "user" as const,
       content: `msg ${i}`,
     }));
@@ -53,7 +55,7 @@ describe("validateRequest", () => {
   });
 
   it("rejects overlong content", () => {
-    const long = "a".repeat(8001);
+    const long = "a".repeat(32001);
     expect(
       validateRequest({ messages: [{ role: "user", content: long }] }),
     ).toContain("exceeds");
@@ -77,9 +79,16 @@ describe("validateRequest", () => {
 // Integration: POST /api/chat
 // ---------------------------------------------------------------------------
 
+let testUserId: number;
+
+// Build a minimal Express app that injects testUserId, bypassing real JWT auth
 function buildApp() {
   const app = express();
   app.use(express.json({ limit: "1mb" }));
+  app.use((req, _res, next) => {
+    (req as AuthRequest).userId = testUserId;
+    next();
+  });
   app.post("/api/chat", handleChat);
   return app;
 }
@@ -90,11 +99,18 @@ describe("POST /api/chat", () => {
 
   beforeEach(() => {
     process.env.DEEPSEEK_API_KEY = "sk-test-key";
+    // Insert a test user so handleChat can read system_prompt/api_key and write conversations
+    const result = db
+      .prepare("INSERT INTO users (username, password, display_name) VALUES (?, ?, ?)")
+      .run(`_test_${Date.now()}`, "hash", "Test User");
+    testUserId = result.lastInsertRowid as number;
   });
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
+    // Clean up test user (cascades to conversations/messages)
+    db.prepare("DELETE FROM users WHERE id = ?").run(testUserId);
   });
 
   it("returns error SSE when API key is missing", async () => {
@@ -106,7 +122,7 @@ describe("POST /api/chat", () => {
 
     expect(res.status).toBe(200); // SSE over HTTP 200
     expect(res.text).toContain("event: error");
-    expect(res.text).toContain("DEEPSEEK_API_KEY");
+    expect(res.text).toContain("API Key");
   });
 
   it("returns error SSE for invalid body", async () => {
@@ -193,18 +209,19 @@ describe("POST /api/chat", () => {
     });
 
     // Create mock req/res
-    const events: Array<[string, (...args: unknown[]) => void]> = [];
+    const resEvents: Array<[string, (...args: unknown[]) => void]> = [];
     const req = {
+      userId: testUserId,
       body: { messages: [{ role: "user" as const, content: "hello" }] },
-      on: vi.fn((event: string, cb: () => void) => {
-        events.push([event, cb]);
-        return req;
-      }),
     };
     const res = {
       setHeader: vi.fn(),
       write: vi.fn(),
       end: vi.fn(),
+      on: vi.fn((event: string, cb: () => void) => {
+        resEvents.push([event, cb]);
+        return res;
+      }),
       get headersSent() {
         return false;
       },
@@ -224,7 +241,7 @@ describe("POST /api/chat", () => {
     expect(capturedSignal!.aborted).toBe(false);
 
     // Simulate client disconnect
-    const closeCb = events.find(([e]) => e === "close")?.[1];
+    const closeCb = resEvents.find(([e]) => e === "close")?.[1];
     expect(closeCb).toBeDefined();
     closeCb!();
 

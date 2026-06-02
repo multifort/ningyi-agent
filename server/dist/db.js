@@ -22,6 +22,7 @@ db.exec(`
     display_name  TEXT    NOT NULL DEFAULT '',
     system_prompt TEXT    NOT NULL DEFAULT '',
     api_key       TEXT,
+    token_version INTEGER NOT NULL DEFAULT 0,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
   );
@@ -45,6 +46,29 @@ db.exec(`
     created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS knowledge_base (
+    id         TEXT    PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    name       TEXT    NOT NULL,
+    content    TEXT    NOT NULL,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS share_tokens (
+    token           TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    expires_at      TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+  );
+
+  -- JWT blacklist for explicit logout. Entries expire with the token itself.
+  CREATE TABLE IF NOT EXISTS token_blacklist (
+    jti        TEXT PRIMARY KEY,
+    expires_at TEXT NOT NULL
+  );
 `);
 // Indexes (IF NOT EXISTS not supported for indexes in SQLite, catch dup)
 for (const idx of [
@@ -57,5 +81,39 @@ for (const idx of [
     }
     catch { /* index already exists */ }
 }
+// FTS5 virtual table for full-text search over message content + conversation titles.
+// content='' means external-content mode — we manage inserts/deletes via triggers.
+try {
+    db.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+      content,
+      conversation_id UNINDEXED,
+      content=messages,
+      content_rowid=rowid
+    );
+
+    -- Keep FTS in sync with messages table
+    CREATE TRIGGER IF NOT EXISTS messages_fts_insert AFTER INSERT ON messages BEGIN
+      INSERT INTO messages_fts(rowid, content, conversation_id) VALUES (new.rowid, new.content, new.conversation_id);
+    END;
+    CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
+      INSERT INTO messages_fts(messages_fts, rowid, content, conversation_id) VALUES ('delete', old.rowid, old.content, old.conversation_id);
+    END;
+    CREATE TRIGGER IF NOT EXISTS messages_fts_update AFTER UPDATE ON messages BEGIN
+      INSERT INTO messages_fts(messages_fts, rowid, content, conversation_id) VALUES ('delete', old.rowid, old.content, old.conversation_id);
+      INSERT INTO messages_fts(rowid, content, conversation_id) VALUES (new.rowid, new.content, new.conversation_id);
+    END;
+  `);
+}
+catch { /* already exists */ }
+// Also add token_version column to existing DBs that predate this migration
+try {
+    db.exec("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0");
+}
+catch { /* column already exists */ }
+// Periodically purge expired blacklist entries (runs every hour, non-blocking)
+setInterval(() => {
+    db.prepare("DELETE FROM token_blacklist WHERE expires_at <= datetime('now')").run();
+}, 60 * 60 * 1000).unref();
 export default db;
 //# sourceMappingURL=db.js.map

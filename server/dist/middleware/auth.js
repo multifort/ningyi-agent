@@ -3,7 +3,7 @@
  */
 import jwt from "jsonwebtoken";
 import db from "../db.js";
-const JWT_SECRET = process.env.JWT_SECRET ?? "hermes-chat-secret-change-me";
+const JWT_SECRET = process.env.JWT_SECRET;
 export function authMiddleware(req, res, next) {
     const header = req.headers.authorization;
     if (!header?.startsWith("Bearer ")) {
@@ -13,12 +13,27 @@ export function authMiddleware(req, res, next) {
     const token = header.slice(7);
     try {
         const payload = jwt.verify(token, JWT_SECRET);
-        // Verify user still exists
+        // Check blacklist (explicit logout)
+        if (payload.jti) {
+            const blocked = db
+                .prepare("SELECT 1 FROM token_blacklist WHERE jti = ?")
+                .get(payload.jti);
+            if (blocked) {
+                res.status(401).json({ message: "令牌已失效，请重新登录" });
+                return;
+            }
+        }
+        // Verify user still exists and token_version matches (password change invalidation)
         const user = db
-            .prepare("SELECT id FROM users WHERE id = ?")
+            .prepare("SELECT id, token_version FROM users WHERE id = ?")
             .get(payload.userId);
         if (!user) {
             res.status(401).json({ message: "用户不存在" });
+            return;
+        }
+        if (payload.tokenVersion !== undefined &&
+            payload.tokenVersion !== user.token_version) {
+            res.status(401).json({ message: "令牌已失效，请重新登录" });
             return;
         }
         req.userId = payload.userId;

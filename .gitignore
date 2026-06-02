@@ -14,3 +14,7 @@ node_modules/
 # OS / editor
 .DS_Store
 *.swp
+
+# Runtime data
+server/data/
+server/dist/
