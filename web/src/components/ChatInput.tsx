@@ -17,6 +17,8 @@ export function ChatInput({
   onToggleSearch,
   canContinue,
   onContinue,
+  agentMode,
+  onToggleAgentMode,
 }: {
   onSend: (text: string, fileContent?: string) => void;
   onStop: () => void;
@@ -27,6 +29,8 @@ export function ChatInput({
   onToggleSearch: () => void;
   canContinue: boolean;
   onContinue: () => void;
+  agentMode: boolean;
+  onToggleAgentMode: () => void;
 }) {
   const [input, setInput] = useState("");
   const [fileName, setFileName] = useState("");
@@ -167,6 +171,14 @@ export function ChatInput({
             </button>
             <button className={`btn-tool ${searchEnabled ? "btn-tool-active" : ""}`} onClick={onToggleSearch}
               title={searchEnabled ? "关闭联网搜索" : "开启联网搜索"}>🌐</button>
+            <button
+              className={`btn-tool btn-mode-toggle ${agentMode ? "btn-tool-active" : ""}`}
+              onClick={onToggleAgentMode}
+              title={agentMode ? "当前：Agent 模式（点击切换为 Chat 模式）" : "当前：Chat 模式（点击切换为 Agent 模式）"}
+              style={{ fontWeight: agentMode ? 700 : 400 }}
+            >
+              {agentMode ? "⚡ Agent" : "💬 Chat"}
+            </button>
           </div>
           <div className="toolbar-right">
             {canContinue && !streaming && (

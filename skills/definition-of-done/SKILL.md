@@ -27,6 +27,8 @@ Run through every item. If one fails, the change is NOT done.
 
 ## Pitfalls
 - **Content filter**: `write_file` and `patch` can mangle strings like `process.env.XXX` or `"7d"`. See `references/content-filter-workaround.md` for workarounds.
+- **Stale background processes**: `npm --prefix server run dev` with `background=true` leaves orphan tsx processes that spam notifications. Before restarting the backend, kill existing: `kill $(lsof -t -i :8787) 2>/dev/null`.
+- **GitHub push hangs**: If `git push origin main` hangs with credential helper, use direct URL: `GIT_TERMINAL_PROMPT=0 git push "https://user:token@github.com/owner/repo.git" main`.
 - Marking done with skipped/xfail tests left silently in place.
 - "I'll update docs later" — later never comes; do it in the same change.
 - Bundling unrelated refactors into the diff.
@@ -41,3 +43,4 @@ Run through every item. If one fails, the change is NOT done.
 - `references/express5-sse-quirks.md` — Express 5 SSE streaming pitfalls and fixes
 - `references/vite-cors-theming.md` — Vite host binding, CORS, and CSS theming patterns
 - `references/content-filter-workaround.md` — write_file/patch string mangling workarounds
+- `references/ui-patterns.md` — DeepSeek风格 + 元宝式输入框 + 登录动画 UI 设计模式

@@ -12,6 +12,8 @@ config({ path: resolve(__dirname, "..", "..", ".env") });
 import express from "express";
 import cors from "cors";
 import { handleChat } from "./chat.js";
+import { handleAgentChat } from "./agent-chat.js";
+import { hermesHealth } from "./hermes-bridge.js";
 import authRoutes from "./auth.js";
 import conversationRoutes from "./conversations.js";
 import knowledgeRoutes from "./knowledge.js";
@@ -90,10 +92,13 @@ app.get("/api/health", async (_req, res) => {
   } catch (e) {
     deepseek = e instanceof Error ? e.message : "unreachable";
   }
+  const hermes = await hermesHealth().catch(() => false) ? "ok" : "offline";
+
   res.json({
     status: "ok",
     keyLoaded: !!process.env.DEEPSEEK_API_KEY,
     deepseek,
+    hermes,
   });
 });
 
@@ -110,7 +115,11 @@ app.use("/api", authMiddleware, fetchUrlRoutes);
 app.use("/api", authMiddleware, shareRoutes);
 app.use(shareRoutes); // GET /share/:token is public
 
-app.post("/api/chat", authMiddleware, handleChat);
+app.post("/api/chat", authMiddleware, (req, res) => {
+  const mode = (req.body as Record<string, unknown>)?.mode;
+  if (mode === "agent") return handleAgentChat(req, res);
+  return handleChat(req, res);
+});
 
 // ── Start ───────────────────────────────────────
 

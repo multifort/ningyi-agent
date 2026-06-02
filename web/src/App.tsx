@@ -54,6 +54,16 @@ export default function App() {
     useState<SettingsData>(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [agentMode, setAgentMode] = useState<boolean>(() => {
+    try { return localStorage.getItem("agent-mode") === "true"; } catch { return false; }
+  });
+  const handleToggleAgentMode = useCallback(() => {
+    setAgentMode((prev) => {
+      const next = !prev;
+      localStorage.setItem("agent-mode", String(next));
+      return next;
+    });
+  }, []);
 
   const activeId = state.activeConversationId;
   const messages = getActiveMessages(state);
@@ -108,7 +118,6 @@ export default function App() {
           onReasoning: (t) => dispatch({ type: "APPEND_REASONING", messageId: assistantMsg.id, token: t }),
           onDone: (newConvId) => {
             dispatch({ type: "SET_STREAMING", streaming: false });
-            // Desktop notification
             if (document.visibilityState === "hidden" && Notification.permission === "granted") {
               new Notification("宁翼智能助手", { body: "回复已完成", icon: "/logo.png" });
             }
@@ -121,9 +130,10 @@ export default function App() {
           },
           onError: (message) => dispatch({ type: "SET_ERROR", error: message }),
         },
+        agentMode,
       );
     },
-    [activeId, token],
+    [activeId, token, agentMode],
   );
 
   const sendMessage = useCallback(
@@ -331,6 +341,8 @@ export default function App() {
           onToggleSearch={() => setSearchEnabled(!searchEnabled)}
           canContinue={canContinue}
           onContinue={handleContinue}
+          agentMode={agentMode}
+          onToggleAgentMode={handleToggleAgentMode}
         />
       </main>
 
@@ -379,10 +391,11 @@ function streamChatAuth(
   token: string,
   callbacks: {
     onToken: (content: string) => void;
-  onReasoning?: (content: string) => void;
+    onReasoning?: (content: string) => void;
     onDone: (conversationId?: string) => void;
     onError: (message: string) => void;
   },
+  agentMode = false,
 ): AbortController {
   const controller = new AbortController();
 
@@ -390,6 +403,7 @@ function streamChatAuth(
     try {
       const body: Record<string, unknown> = { messages, model: "deepseek-chat" };
       if (conversationId) body.conversationId = conversationId;
+      if (agentMode) body.mode = "agent";
 
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -429,6 +443,9 @@ function streamChatAuth(
             const data = JSON.parse(dataStr);
             if (eventType === "reasoning") {
               callbacks.onReasoning?.(data.content);
+            } else if (eventType === "thinking") {
+              // Agent mode: Hermes is working — onReasoning used to show spinner text
+              callbacks.onReasoning?.("⚡ Hermes Agent 正在思考…");
             } else if (data.content) {
               callbacks.onToken(data.content);
             } else if (data.finished !== undefined) {

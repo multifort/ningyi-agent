@@ -76,6 +76,14 @@ db.exec(`
     jti        TEXT PRIMARY KEY,
     expires_at TEXT NOT NULL
   );
+
+  -- Maps our conversation IDs to Hermes session IDs (for resume)
+  CREATE TABLE IF NOT EXISTS agent_sessions (
+    conversation_id  TEXT PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
+    hermes_session   TEXT NOT NULL,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Indexes (IF NOT EXISTS not supported for indexes in SQLite, catch dup)
