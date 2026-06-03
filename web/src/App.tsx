@@ -561,8 +561,8 @@ function streamChatAuth(
             if (eventType === "reasoning") {
               callbacks.onReasoning?.(data.content);
             } else if (eventType === "thinking") {
-              // Agent mode: Hermes is working — onReasoning used to show spinner text
-              callbacks.onReasoning?.("⚡ Hermes Agent 正在思考…");
+              // Agent mode "working" state is shown by the empty-message
+              // "正在思考…" indicator; no reasoning text needed here.
             } else if (eventType === "tool_start") {
               callbacks.onToolStart?.(data.stepId, data.toolName, data.input ?? "");
             } else if (eventType === "tool_end") {

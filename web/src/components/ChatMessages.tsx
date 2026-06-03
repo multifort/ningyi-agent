@@ -102,8 +102,10 @@ function ChatMessage({
           {isUser ? (
             <p>{message.content}</p>
           ) : isEmpty ? (
-            !message.toolCalls || message.toolCalls.length === 0 ? (
+            streaming ? (
               <span className="msg-typing">正在思考…</span>
+            ) : !message.toolCalls || message.toolCalls.length === 0 ? (
+              <span className="msg-stopped">已停止生成</span>
             ) : null
           ) : (
             <ReactMarkdown
@@ -185,13 +187,14 @@ export function ChatMessages({
           <button className="btn-regenerate" onClick={onClearChat}>🗑 清空</button>
         </div>
       )}
-      {messages.map((m) => (
+      {messages.map((m, i) => (
         <ChatMessage
           key={m.id}
           message={m}
           onEdit={onEditMessage}
           onRegenerateMsg={onRegenerateMessage}
-          streaming={streaming}
+          // Only the last message is the one actively streaming.
+          streaming={streaming && i === messages.length - 1}
           userAvatar={userAvatar}
         />
       ))}

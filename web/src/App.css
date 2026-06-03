@@ -462,6 +462,12 @@ body {
   animation: pulse 1.5s infinite;
 }
 
+.msg-stopped {
+  color: var(--text-muted);
+  font-style: italic;
+  opacity: 0.7;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
