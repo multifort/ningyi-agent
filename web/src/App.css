@@ -1112,3 +1112,60 @@ body {
   max-width: 100%;
   height: auto;
 }
+
+/* ── Agent tool-call cards ──────────────────── */
+.tool-call-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.tool-call-card {
+  border: 1px solid rgba(77, 107, 254, 0.18);
+  border-radius: 10px;
+  background: rgba(77, 107, 254, 0.05);
+  overflow: hidden;
+  font-size: 0.82rem;
+}
+.tool-call-running { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.06); }
+.tool-call-error { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.06); }
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.tool-call-icon { font-size: 0.95rem; }
+.tool-call-label { font-weight: 600; color: var(--accent); white-space: nowrap; }
+.tool-call-input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-call-status { white-space: nowrap; font-size: 0.78rem; }
+.tool-call-done { color: #22c55e; }
+.tool-call-err { color: #ef4444; }
+.tool-call-spinner { animation: tool-pulse 1s ease-in-out infinite; }
+@keyframes tool-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.tool-call-chevron { color: var(--text-muted); font-size: 0.7rem; }
+.tool-call-body { padding: 0 12px 10px; }
+.tool-call-section { margin-top: 8px; }
+.tool-call-section-title { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tool-call-pre {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+/* ── Agent mode toggle button ───────────────── */
+.btn-mode-toggle { white-space: nowrap; }

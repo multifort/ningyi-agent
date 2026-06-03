@@ -94,6 +94,7 @@ export default function App() {
             id: m.id as string,
             role: m.role as Message["role"],
             content: m.content as string,
+            toolCalls: (m.toolCalls as Message["toolCalls"]) ?? undefined,
           })),
         });
       })
@@ -116,6 +117,10 @@ export default function App() {
         {
           onToken: (t) => dispatch({ type: "APPEND_TOKEN", messageId: assistantMsg.id, token: t }),
           onReasoning: (t) => dispatch({ type: "APPEND_REASONING", messageId: assistantMsg.id, token: t }),
+          onToolStart: (stepId, toolName, input) =>
+            dispatch({ type: "TOOL_START", messageId: assistantMsg.id, stepId, toolName, input }),
+          onToolEnd: (stepId, output, durationMs) =>
+            dispatch({ type: "TOOL_END", messageId: assistantMsg.id, stepId, output, durationMs }),
           onDone: (newConvId) => {
             dispatch({ type: "SET_STREAMING", streaming: false });
             if (document.visibilityState === "hidden" && Notification.permission === "granted") {
@@ -392,6 +397,8 @@ function streamChatAuth(
   callbacks: {
     onToken: (content: string) => void;
     onReasoning?: (content: string) => void;
+    onToolStart?: (stepId: number, toolName: string, input: string) => void;
+    onToolEnd?: (stepId: number, output: string, durationMs: number | null) => void;
     onDone: (conversationId?: string) => void;
     onError: (message: string) => void;
   },
@@ -446,6 +453,10 @@ function streamChatAuth(
             } else if (eventType === "thinking") {
               // Agent mode: Hermes is working — onReasoning used to show spinner text
               callbacks.onReasoning?.("⚡ Hermes Agent 正在思考…");
+            } else if (eventType === "tool_start") {
+              callbacks.onToolStart?.(data.stepId, data.toolName, data.input ?? "");
+            } else if (eventType === "tool_end") {
+              callbacks.onToolEnd?.(data.stepId, data.output ?? "", data.durationMs ?? null);
             } else if (data.content) {
               callbacks.onToken(data.content);
             } else if (data.finished !== undefined) {

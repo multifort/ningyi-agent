@@ -116,6 +116,8 @@ export async function handleAgentChat(
 
   let fullContent = "";
   let newHermesSessionId = hermesSessionId;
+  const assistantMsgId = randomUUID();
+  const toolCallRows: Array<{ stepId: number; name: string; input: string; durationMs: number | null }> = [];
 
   try {
     for await (const { event, data } of hermesStream(
@@ -127,6 +129,17 @@ export async function handleAgentChat(
 
       if (event === "token") {
         fullContent += (data as { content: string }).content;
+      }
+
+      if (event === "tool_start") {
+        const d = data as { stepId: number; toolName: string; input: string };
+        toolCallRows.push({ stepId: d.stepId, name: d.toolName, input: d.input, durationMs: null });
+      }
+
+      if (event === "tool_end") {
+        const d = data as { stepId: number; durationMs: number | null };
+        const row = toolCallRows.find((r) => r.stepId === d.stepId);
+        if (row) row.durationMs = d.durationMs;
       }
 
       if (event === "done") {
@@ -149,10 +162,18 @@ export async function handleAgentChat(
     if (fullContent) {
       db.prepare(
         "INSERT INTO messages (id, conversation_id, role, content) VALUES (?, ?, ?, ?)",
-      ).run(randomUUID(), conversationId, "assistant", fullContent);
+      ).run(assistantMsgId, conversationId, "assistant", fullContent);
       db.prepare(
         "UPDATE conversations SET updated_at = datetime('now') WHERE id = ?",
       ).run(conversationId);
+    }
+
+    // Persist tool calls for traceability
+    for (const t of toolCallRows) {
+      db.prepare(`
+        INSERT INTO tool_calls (id, conversation_id, message_id, step_index, tool_name, input, status, duration_ms)
+        VALUES (?, ?, ?, ?, ?, ?, 'done', ?)
+      `).run(randomUUID(), conversationId, assistantMsgId, t.stepId, t.name, t.input, t.durationMs);
     }
 
     // Persist / update Hermes session mapping

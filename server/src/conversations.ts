@@ -124,6 +124,20 @@ router.get("/conversations/:id/messages", (req: AuthRequest, res) => {
     )
     .all(id) as Array<Record<string, unknown>>;
 
+  // Attach tool calls (Agent-mode messages) keyed by message_id
+  const toolRows = db
+    .prepare(
+      "SELECT * FROM tool_calls WHERE conversation_id = ? ORDER BY step_index",
+    )
+    .all(id) as Array<Record<string, unknown>>;
+  const toolsByMsg = new Map<string, Array<Record<string, unknown>>>();
+  for (const t of toolRows) {
+    const key = t.message_id as string;
+    if (!key) continue;
+    if (!toolsByMsg.has(key)) toolsByMsg.set(key, []);
+    toolsByMsg.get(key)!.push(t);
+  }
+
   res.json({
     messages: rows.map((m) => ({
       id: m.id,
@@ -131,6 +145,14 @@ router.get("/conversations/:id/messages", (req: AuthRequest, res) => {
       content: m.content,
       tokenCount: m.token_count,
       createdAt: m.created_at,
+      toolCalls: (toolsByMsg.get(m.id as string) ?? []).map((t) => ({
+        stepId: t.step_index,
+        toolName: t.tool_name,
+        input: t.input,
+        output: t.output,
+        durationMs: t.duration_ms,
+        status: t.status,
+      })),
     })),
   });
 });

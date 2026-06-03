@@ -5,6 +5,7 @@ import rehypeKatex from "rehype-katex";
 import mermaid from "mermaid";
 import "katex/dist/katex.min.css";
 import type { Message } from "../types";
+import { ToolCallList } from "./ToolCallCard";
 import logoImg from "/logo.png";
 
 mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: { darkMode: true, background: "#1c1c1f", primaryColor: "#5b7cff" } });
@@ -92,10 +93,15 @@ function ChatMessage({
               <div className="reasoning-content">{message.reasoning}</div>
             </details>
           )}
+          {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+            <ToolCallList tools={message.toolCalls} />
+          )}
           {isUser ? (
             <p>{message.content}</p>
           ) : isEmpty ? (
-            <span className="msg-typing">正在思考…</span>
+            !message.toolCalls || message.toolCalls.length === 0 ? (
+              <span className="msg-typing">正在思考…</span>
+            ) : null
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkMath]}
