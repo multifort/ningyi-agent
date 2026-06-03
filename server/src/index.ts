@@ -12,6 +12,11 @@ config({ path: resolve(__dirname, "..", "..", ".env") });
 import express from "express";
 import cors from "cors";
 import { handleChat } from "./chat.js";
+import { handleAgentChat } from "./agent-chat.js";
+import { hermesHealth } from "./hermes-bridge.js";
+import memoryRoutes from "./memory.js";
+import skillRoutes from "./skills.js";
+import schedulerRoutes, { startScheduler } from "./scheduler.js";
 import authRoutes from "./auth.js";
 import conversationRoutes from "./conversations.js";
 import knowledgeRoutes from "./knowledge.js";
@@ -90,10 +95,13 @@ app.get("/api/health", async (_req, res) => {
   } catch (e) {
     deepseek = e instanceof Error ? e.message : "unreachable";
   }
+  const hermes = await hermesHealth().catch(() => false) ? "ok" : "offline";
+
   res.json({
     status: "ok",
     keyLoaded: !!process.env.DEEPSEEK_API_KEY,
     deepseek,
+    hermes,
   });
 });
 
@@ -108,9 +116,16 @@ app.use("/api", authMiddleware, conversationRoutes);
 app.use("/api", authMiddleware, knowledgeRoutes);
 app.use("/api", authMiddleware, fetchUrlRoutes);
 app.use("/api", authMiddleware, shareRoutes);
+app.use("/api", memoryRoutes);
+app.use("/api", skillRoutes);
+app.use("/api", schedulerRoutes);
 app.use(shareRoutes); // GET /share/:token is public
 
-app.post("/api/chat", authMiddleware, handleChat);
+app.post("/api/chat", authMiddleware, (req, res) => {
+  const mode = (req.body as Record<string, unknown>)?.mode;
+  if (mode === "agent") return handleAgentChat(req, res);
+  return handleChat(req, res);
+});
 
 // ── Start ───────────────────────────────────────
 
@@ -119,6 +134,7 @@ app.listen(PORT, () => {
   if (!process.env.DEEPSEEK_API_KEY) {
     console.warn("⚠  DEEPSEEK_API_KEY is not set — /api/chat will use per-user keys only.");
   }
+  startScheduler();
 });
 
 export { app };

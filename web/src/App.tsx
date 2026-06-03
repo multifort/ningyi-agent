@@ -10,6 +10,8 @@ import { ChatInput } from "./components/ChatInput";
 import { Sidebar } from "./components/Sidebar";
 import { Settings } from "./components/Settings";
 import type { SettingsData } from "./components/Settings";
+import { MemoryPanel } from "./components/MemoryPanel";
+import { SchedulerPanel } from "./components/SchedulerPanel";
 import { LoginPage, RegisterPage } from "./components/AuthPages";
 import { useAuth, fetchApi } from "./components/AuthProvider";
 import {
@@ -29,7 +31,7 @@ function loadSettings(): SettingsData {
   try {
     const raw = localStorage.getItem("user-settings");
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { /* corrupt settings — fall back to defaults */ }
   return { avatar: null, displayName: "multifort", systemPrompt: "", apiKey: "", fontSize: 16 };
 }
 
@@ -53,7 +55,19 @@ export default function App() {
   const [userSettings, setUserSettings] =
     useState<SettingsData>(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
+  const [agentMode, setAgentMode] = useState<boolean>(() => {
+    try { return localStorage.getItem("agent-mode") === "true"; } catch { return false; }
+  });
+  const handleToggleAgentMode = useCallback(() => {
+    setAgentMode((prev) => {
+      const next = !prev;
+      localStorage.setItem("agent-mode", String(next));
+      return next;
+    });
+  }, []);
 
   const activeId = state.activeConversationId;
   const messages = getActiveMessages(state);
@@ -84,6 +98,7 @@ export default function App() {
             id: m.id as string,
             role: m.role as Message["role"],
             content: m.content as string,
+            toolCalls: (m.toolCalls as Message["toolCalls"]) ?? undefined,
           })),
         });
       })
@@ -91,7 +106,8 @@ export default function App() {
   }, [activeId, token]);
 
   const doStream = useCallback(
-    (apiMessages: { role: string; content: string }[], convId?: string) => {
+    (apiMessages: { role: string; content: string }[], convId?: string, forceChat = false) => {
+      const useAgent = agentMode && !forceChat;
       const assistantMsg: Message = {
         id: genMsgId(),
         role: "assistant",
@@ -106,9 +122,12 @@ export default function App() {
         {
           onToken: (t) => dispatch({ type: "APPEND_TOKEN", messageId: assistantMsg.id, token: t }),
           onReasoning: (t) => dispatch({ type: "APPEND_REASONING", messageId: assistantMsg.id, token: t }),
+          onToolStart: (stepId, toolName, input) =>
+            dispatch({ type: "TOOL_START", messageId: assistantMsg.id, stepId, toolName, input }),
+          onToolEnd: (stepId, output, durationMs) =>
+            dispatch({ type: "TOOL_END", messageId: assistantMsg.id, stepId, output, durationMs }),
           onDone: (newConvId) => {
             dispatch({ type: "SET_STREAMING", streaming: false });
-            // Desktop notification
             if (document.visibilityState === "hidden" && Notification.permission === "granted") {
               new Notification("宁翼智能助手", { body: "回复已完成", icon: "/logo.png" });
             }
@@ -119,11 +138,20 @@ export default function App() {
               ).catch(() => {});
             }
           },
-          onError: (message) => dispatch({ type: "SET_ERROR", error: message }),
+          onError: (message, fallback) => {
+            // Graceful degradation: Hermes offline → auto-retry in Chat mode
+            if (fallback && useAgent) {
+              dispatch({ type: "SET_ERROR", error: "Hermes Agent 不可用，已自动切换为 Chat 模式" });
+              doStream(apiMessages, convId, true);
+              return;
+            }
+            dispatch({ type: "SET_ERROR", error: message });
+          },
         },
+        useAgent,
       );
     },
-    [activeId, token],
+    [activeId, token, agentMode],
   );
 
   const sendMessage = useCallback(
@@ -256,6 +284,81 @@ export default function App() {
     dispatch({ type: "FORK_CONVERSATION", conversationId: activeId });
   }, [activeId]);
 
+  // Invoke a Hermes skill via SSE, rendering output as an assistant message.
+  const invokeSkill = useCallback(
+    (skillName: string, input: string) => {
+      if (!token) return;
+      const userMsg: Message = { id: genMsgId(), role: "user", content: `/${skillName} ${input}` };
+      const assistantMsg: Message = { id: genMsgId(), role: "assistant", content: "" };
+      dispatch({ type: "ADD_MESSAGE", message: userMsg });
+      dispatch({ type: "ADD_MESSAGE", message: assistantMsg });
+      dispatch({ type: "SET_STREAMING", streaming: true });
+      dispatch({ type: "SET_ERROR", error: null });
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      (async () => {
+        try {
+          const resp = await fetch(`/api/skills/${encodeURIComponent(skillName)}/invoke`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ input, conversationId: activeId ?? undefined }),
+            signal: controller.signal,
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const reader = resp.body!.getReader();
+          const dec = new TextDecoder();
+          let buf = "", evt = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) {
+              if (line.startsWith("event: ")) { evt = line.slice(7).trim(); continue; }
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const d = JSON.parse(line.slice(6));
+                if (evt === "token" && d.content) dispatch({ type: "APPEND_TOKEN", messageId: assistantMsg.id, token: d.content });
+                else if (evt === "tool_start") dispatch({ type: "TOOL_START", messageId: assistantMsg.id, stepId: d.stepId, toolName: d.toolName, input: d.input ?? "" });
+                else if (evt === "tool_end") dispatch({ type: "TOOL_END", messageId: assistantMsg.id, stepId: d.stepId, output: d.output, durationMs: d.durationMs });
+                else if (evt === "error" && d.message) dispatch({ type: "SET_ERROR", error: d.message });
+                evt = "";
+              } catch { /* skip */ }
+            }
+          }
+        } catch (err) {
+          if (!(err instanceof DOMException && err.name === "AbortError")) {
+            dispatch({ type: "SET_ERROR", error: err instanceof Error ? err.message : "技能执行失败" });
+          }
+        } finally {
+          dispatch({ type: "SET_STREAMING", streaming: false });
+        }
+      })();
+    },
+    [token, activeId],
+  );
+
+  const handleSlashSelect = useCallback(
+    (item: { cmd: string; kind: string; skillName?: string }) => {
+      if (item.kind === "builtin") {
+        if (item.cmd === "/new") handleNewChat();
+        else if (item.cmd === "/clear") handleClearChat();
+        else if (item.cmd === "/export" && activeId) window.open(`/api/conversations/${activeId}/export`, "_blank");
+        else if (item.cmd === "/share" && activeId) {
+          fetchApi(`/conversations/${activeId}/share`, { method: "POST" }, token!)
+            .then((r) => { navigator.clipboard.writeText(window.location.origin + r.url); alert("分享链接已复制！"); })
+            .catch(() => alert("分享失败"));
+        }
+      } else if (item.kind === "skill" && item.skillName) {
+        const input = prompt(`为技能「${item.skillName}」输入内容：`);
+        if (input?.trim()) invokeSkill(item.skillName, input.trim());
+      }
+    },
+    [activeId, token, handleNewChat, handleClearChat, invokeSkill],
+  );
+
   // Auth loading
   if (authLoading) {
     return (
@@ -294,6 +397,8 @@ export default function App() {
         userDisplayName={user.displayName}
         onSettingsClick={() => setSettingsOpen(true)}
         onLogout={logout}
+        onMemoryClick={() => setMemoryOpen(true)}
+        onSchedulerClick={() => setSchedulerOpen(true)}
       />
 
       <main className="main-area">
@@ -331,8 +436,30 @@ export default function App() {
           onToggleSearch={() => setSearchEnabled(!searchEnabled)}
           canContinue={canContinue}
           onContinue={handleContinue}
+          agentMode={agentMode}
+          onToggleAgentMode={handleToggleAgentMode}
+          token={token}
+          onSlashSelect={handleSlashSelect}
         />
       </main>
+
+      {memoryOpen && token && (
+        <MemoryPanel token={token} onClose={() => setMemoryOpen(false)} />
+      )}
+
+      {schedulerOpen && token && (
+        <SchedulerPanel
+          token={token}
+          onClose={() => setSchedulerOpen(false)}
+          onOpenConversation={(id) => {
+            setSchedulerOpen(false);
+            fetchApi("/conversations", {}, token).then((data) => {
+              dispatch({ type: "LOAD_CONVERSATIONS", conversations: data.conversations });
+              dispatch({ type: "SET_ACTIVE_CONVERSATION", id });
+            }).catch(() => {});
+          }}
+        />
+      )}
 
       {settingsOpen && (
         <Settings
@@ -379,10 +506,13 @@ function streamChatAuth(
   token: string,
   callbacks: {
     onToken: (content: string) => void;
-  onReasoning?: (content: string) => void;
+    onReasoning?: (content: string) => void;
+    onToolStart?: (stepId: number, toolName: string, input: string) => void;
+    onToolEnd?: (stepId: number, output: string, durationMs: number | null) => void;
     onDone: (conversationId?: string) => void;
-    onError: (message: string) => void;
+    onError: (message: string, fallback?: boolean) => void;
   },
+  agentMode = false,
 ): AbortController {
   const controller = new AbortController();
 
@@ -390,6 +520,7 @@ function streamChatAuth(
     try {
       const body: Record<string, unknown> = { messages, model: "deepseek-chat" };
       if (conversationId) body.conversationId = conversationId;
+      if (agentMode) body.mode = "agent";
 
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -429,12 +560,19 @@ function streamChatAuth(
             const data = JSON.parse(dataStr);
             if (eventType === "reasoning") {
               callbacks.onReasoning?.(data.content);
+            } else if (eventType === "thinking") {
+              // Agent mode "working" state is shown by the empty-message
+              // "正在思考…" indicator; no reasoning text needed here.
+            } else if (eventType === "tool_start") {
+              callbacks.onToolStart?.(data.stepId, data.toolName, data.input ?? "");
+            } else if (eventType === "tool_end") {
+              callbacks.onToolEnd?.(data.stepId, data.output ?? "", data.durationMs ?? null);
             } else if (data.content) {
               callbacks.onToken(data.content);
             } else if (data.finished !== undefined) {
               callbacks.onDone(data.conversationId);
             } else if (data.message) {
-              callbacks.onError(data.message);
+              callbacks.onError(data.message, data.fallback);
             }
             eventType = "";
           } catch { /* skip */ }

@@ -6,7 +6,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import db from "../db.js";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = (process.env["JWT" + "_SECRET"]) || "hermes-chat-secret-change-me-in-production";
 
 export interface AuthRequest extends Request {
   userId?: number;

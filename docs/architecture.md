@@ -286,10 +286,63 @@ CREATE INDEX idx_users_username ON users(username);
 
 ---
 
-## 九、ADR 索引
+## 九、Hermes Agent 集成（Agent 模式）
+
+聊天界面支持两种模式，由用户在输入框切换（⚡ Agent / 💬 Chat）：
+
+```
+                       POST /api/chat
+                            │
+              ┌─────────────┴──────────────┐
+       mode: "chat"                  mode: "agent"
+              │                            │
+        handleChat                  handleAgentChat
+              │                            │
+       DeepSeek API                 HermesBridge (subprocess)
+       (流式直连)                    │  spawn: hermes chat -q ... --resume
+                                     ▼
+                              Hermes Agent CLI
+                              (工具调用 / 技能 / 多步)
+                                     │
+                              DeepSeek (Hermes 自己的 key)
+```
+
+- **通信方式**：subprocess（Hermes 仅提供 CLI，无 HTTP API）。`server/src/hermes-bridge.ts`
+  spawn `hermes chat`，verbose 模式解析工具调用（去 ANSI + marker 匹配），
+  `session_id` 用于 `--resume` 维持多轮上下文。
+- **降级**：Hermes 不可用时 Agent 模式自动回退为 Chat 模式（前端 fallback 重试），
+  Chat 模式完全不受影响。
+- **新增模块**：`hermes-bridge.ts`、`agent-chat.ts`、`memory.ts` + `memory-extract.ts`、
+  `skills.ts`、`scheduler.ts` + `cron.ts`。
+
+### 新增 SSE 事件（Agent 模式）
+`thinking` · `tool_start` · `tool_end`（在现有 `token`/`reasoning`/`done`/`error` 之上）。
+> 注：Hermes CLI 不输出独立的「plan/step」事件，多步进度由实时更新的工具调用卡片
+> （running→done）呈现，而非单独的步骤进度条（见 ADR 0003）。
+
+### 新增数据表
+`agent_sessions`（对话↔Hermes session 映射）· `tool_calls`（工具调用记录）·
+`memories`（持久记忆）· `skill_invocations`（技能调用历史）·
+`scheduled_tasks` + `scheduled_runs`（定时任务及执行历史）。
+
+### 新增 API
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST/PUT/DELETE | `/api/memory*` | 记忆 CRUD + `/inject` |
+| GET | `/api/skills` | 可用技能列表 |
+| POST | `/api/skills/:name/invoke` | 调用技能（SSE） |
+| GET/POST/PUT/DELETE | `/api/scheduler/tasks*` | 定时任务 CRUD + `/runs` |
+
+### 相关环境变量
+`HERMES_CLI_PATH` · `HERMES_BRIDGE_MODE` · `ALLOWED_SKILLS` · `AGENT_MEMORY_EXTRACTION`
+（全部可选；缺省时 Agent 能力降级，应用仍可用）。
+
+---
+
+## 十、ADR 索引
 
 | ADR | 决策 | 日期 |
 |-----|------|------|
 | 0001 | 项目由 Hermes Agent 管理 | — |
 | 0002 | 默认 provider DeepSeek | — |
-| 0003 | SQLite + JWT 认证方案（待创建） | — |
+| 0003 | Hermes 集成：双模式 + subprocess 桥接 | 2026-06-03 |

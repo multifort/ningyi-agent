@@ -10,7 +10,7 @@ TEST_CMD  ?= npm --prefix $(WEB) run test --if-present -- --run && npm --prefix 
 LINT_CMD  ?= npm --prefix $(WEB) run lint --if-present && npm --prefix $(SERVER) run lint --if-present
 BUILD_CMD ?= npm --prefix $(WEB) run build
 
-.PHONY: help install dev test lint fmt build review validate install-hooks
+.PHONY: help install dev test lint fmt build review validate install-hooks hermes-health hermes-skills
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -45,6 +45,12 @@ review: lint test ## Quality gate used by definition-of-done (lint + test)
 
 validate: ## Validate the Hermes scaffold itself (config, skills, references)
 	@scripts/validate.sh
+
+hermes-health: ## Check whether the Hermes CLI is reachable for Agent mode
+	@hermes --version >/dev/null 2>&1 && echo "✓ hermes available: $$(hermes --version | head -1)" || echo "✗ hermes CLI not found — Agent mode will degrade to Chat mode"
+
+hermes-skills: ## List skills available to the app's Agent mode
+	@hermes skills list 2>/dev/null | head -20 || echo "hermes CLI not available"
 
 install-hooks: ## Install the git pre-commit hook
 	@test -d .git || { echo "not a git repo"; exit 1; }

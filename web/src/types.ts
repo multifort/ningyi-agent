@@ -1,8 +1,18 @@
+export interface ToolCall {
+  stepId: number;
+  toolName: string;
+  input: string;
+  output?: string;
+  durationMs?: number | null;
+  status: "running" | "done" | "error";
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   reasoning?: string;
+  toolCalls?: ToolCall[];
 }
 
 export interface Conversation {
@@ -36,6 +46,8 @@ export type ChatAction =
   | { type: "ADD_MESSAGE"; message: Message }
   | { type: "APPEND_TOKEN"; messageId: string; token: string }
   | { type: "APPEND_REASONING"; messageId: string; token: string }
+  | { type: "TOOL_START"; messageId: string; stepId: number; toolName: string; input: string }
+  | { type: "TOOL_END"; messageId: string; stepId: number; output?: string; durationMs?: number | null }
   | { type: "SET_STREAMING"; streaming: boolean }
   | { type: "SET_ERROR"; error: string | null }
   | { type: "TOGGLE_SIDEBAR" }
@@ -188,6 +200,45 @@ export function chatReducer(
               : m,
           ),
           updatedAt: Date.now(),
+        };
+      });
+      return { ...state, conversations: convs };
+    }
+    case "TOOL_START": {
+      const convs = state.conversations.map((c) => {
+        if (c.id !== state.activeConversationId) return c;
+        return {
+          ...c,
+          messages: c.messages.map((m) => {
+            if (m.id !== action.messageId) return m;
+            const tc: ToolCall = {
+              stepId: action.stepId,
+              toolName: action.toolName,
+              input: action.input,
+              status: "running",
+            };
+            return { ...m, toolCalls: [...(m.toolCalls ?? []), tc] };
+          }),
+        };
+      });
+      return { ...state, conversations: convs };
+    }
+    case "TOOL_END": {
+      const convs = state.conversations.map((c) => {
+        if (c.id !== state.activeConversationId) return c;
+        return {
+          ...c,
+          messages: c.messages.map((m) => {
+            if (m.id !== action.messageId) return m;
+            return {
+              ...m,
+              toolCalls: (m.toolCalls ?? []).map((t) =>
+                t.stepId === action.stepId
+                  ? { ...t, status: "done" as const, output: action.output, durationMs: action.durationMs }
+                  : t,
+              ),
+            };
+          }),
         };
       });
       return { ...state, conversations: convs };

@@ -1,10 +1,11 @@
-import { useRef, useEffect, useState, type ReactNode } from "react";
+import { useRef, useEffect, useState, useId, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import mermaid from "mermaid";
 import "katex/dist/katex.min.css";
 import type { Message } from "../types";
+import { ToolCallList } from "./ToolCallCard";
 import logoImg from "/logo.png";
 
 mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: { darkMode: true, background: "#1c1c1f", primaryColor: "#5b7cff" } });
@@ -14,10 +15,13 @@ mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: { darkMo
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState("");
-  const id = useRef(`mermaid-${Math.random().toString(36).slice(2)}`);
+  // useId is render-pure and stable; strip ':' so it's a valid mermaid/DOM id.
+  const rawId = useId();
+  const id = `mermaid-${rawId.replace(/:/g, "")}`;
 
   useEffect(() => {
-    mermaid.render(id.current, code).then(({ svg: s }) => setSvg(s)).catch(() => setSvg("<p style='color:#f87171'>图表渲染失败</p>"));
+    mermaid.render(id, code).then(({ svg: s }) => setSvg(s)).catch(() => setSvg("<p style='color:#f87171'>图表渲染失败</p>"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
   return <div ref={ref} className="mermaid-block" dangerouslySetInnerHTML={{ __html: svg }} />;
@@ -92,10 +96,17 @@ function ChatMessage({
               <div className="reasoning-content">{message.reasoning}</div>
             </details>
           )}
+          {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+            <ToolCallList tools={message.toolCalls} />
+          )}
           {isUser ? (
             <p>{message.content}</p>
           ) : isEmpty ? (
-            <span className="msg-typing">正在思考…</span>
+            streaming ? (
+              <span className="msg-typing">正在思考…</span>
+            ) : !message.toolCalls || message.toolCalls.length === 0 ? (
+              <span className="msg-stopped">已停止生成</span>
+            ) : null
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkMath]}
@@ -176,13 +187,14 @@ export function ChatMessages({
           <button className="btn-regenerate" onClick={onClearChat}>🗑 清空</button>
         </div>
       )}
-      {messages.map((m) => (
+      {messages.map((m, i) => (
         <ChatMessage
           key={m.id}
           message={m}
           onEdit={onEditMessage}
           onRegenerateMsg={onRegenerateMessage}
-          streaming={streaming}
+          // Only the last message is the one actively streaming.
+          streaming={streaming && i === messages.length - 1}
           userAvatar={userAvatar}
         />
       ))}

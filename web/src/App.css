@@ -462,6 +462,12 @@ body {
   animation: pulse 1.5s infinite;
 }
 
+.msg-stopped {
+  color: var(--text-muted);
+  font-style: italic;
+  opacity: 0.7;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
@@ -616,7 +622,7 @@ body {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .tool-select {
@@ -675,14 +681,32 @@ body {
 }
 
 .btn-tool-stop {
+  width: auto;
+  padding: 0 12px;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 999px;
+}
+.btn-tool-stop:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
 
 .btn-tool-continue {
-  color: var(--accent);
-  padding: 0 10px;
   width: auto;
+  padding: 0 12px;
+  gap: 4px;
+  white-space: nowrap;
   font-size: 0.78rem;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+}
+.btn-tool-continue:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .file-attachment {
@@ -1112,3 +1136,163 @@ body {
   max-width: 100%;
   height: auto;
 }
+
+/* ── Agent tool-call cards ──────────────────── */
+.tool-call-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.tool-call-card {
+  border: 1px solid rgba(77, 107, 254, 0.18);
+  border-radius: 10px;
+  background: rgba(77, 107, 254, 0.05);
+  overflow: hidden;
+  font-size: 0.82rem;
+}
+.tool-call-running { border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.06); }
+.tool-call-error { border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.06); }
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.tool-call-icon { font-size: 0.95rem; }
+.tool-call-label { font-weight: 600; color: var(--accent); white-space: nowrap; }
+.tool-call-input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-call-status { white-space: nowrap; font-size: 0.78rem; }
+.tool-call-done { color: #22c55e; }
+.tool-call-err { color: #ef4444; }
+.tool-call-spinner { animation: tool-pulse 1s ease-in-out infinite; }
+@keyframes tool-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.tool-call-chevron { color: var(--text-muted); font-size: 0.7rem; }
+.tool-call-body { padding: 0 12px 10px; }
+.tool-call-section { margin-top: 8px; }
+.tool-call-section-title { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+.tool-call-pre {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+/* ── Agent mode toggle button ───────────────── */
+/* Labeled pill — overrides the fixed 30px square of .btn-tool. */
+.btn-mode-toggle {
+  width: auto;
+  height: 30px;
+  padding: 0 12px;
+  margin-left: 6px;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 999px;
+}
+.btn-mode-toggle.btn-tool-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* ── Side panels (Memory / Scheduler) ───────── */
+.panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 100;
+}
+.side-panel {
+  width: min(440px, 92vw);
+  height: 100%;
+  background: var(--bg-elevated, #1c1c1f);
+  border-left: 1px solid var(--border, rgba(255,255,255,0.08));
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: panel-slide 0.2s ease;
+}
+@keyframes panel-slide { from { transform: translateX(30px); opacity: 0.6; } to { transform: translateX(0); opacity: 1; } }
+.panel-header { display: flex; align-items: center; justify-content: space-between; }
+.panel-header h2 { margin: 0; font-size: 1.1rem; }
+.panel-hint { font-size: 0.82rem; color: var(--text-muted); margin: 0; }
+.panel-empty { text-align: center; color: var(--text-muted); padding: 24px; font-size: 0.85rem; }
+
+.memory-add { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border, rgba(255,255,255,0.08)); }
+.memory-list { display: flex; flex-direction: column; gap: 10px; }
+.memory-item { border: 1px solid var(--border, rgba(255,255,255,0.08)); border-radius: 10px; padding: 10px 12px; }
+.memory-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.memory-key { font-weight: 600; font-size: 0.85rem; flex: 1; }
+.memory-source { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; }
+.memory-source-auto { background: rgba(77,107,254,0.15); color: var(--accent); }
+.memory-source-manual { background: rgba(34,197,94,0.15); color: #22c55e; }
+.memory-actions { display: flex; gap: 4px; }
+.memory-btn { font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border, rgba(255,255,255,0.12)); background: transparent; color: var(--text-muted); cursor: pointer; }
+.memory-btn-danger { color: #ef4444; }
+.memory-content { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; white-space: pre-wrap; }
+
+/* ── Slash command menu ─────────────────────── */
+.slash-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elevated, #1c1c1f);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  padding: 6px;
+  z-index: 50;
+}
+.slash-group {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 6px 10px 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.slash-item-active { background: rgba(77,107,254,0.15); }
+.slash-cmd { font-family: ui-monospace, monospace; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.slash-desc { font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Scheduler panel extras ─────────────────── */
+.sched-meta { font-size: 0.74rem; color: var(--text-muted); margin: 3px 0 5px; }
+.sched-meta code { background: rgba(0,0,0,0.25); padding: 1px 6px; border-radius: 4px; }
+.sched-runs { margin-top: 8px; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.sched-run { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: var(--text-muted); cursor: pointer; padding: 2px 0; }
+.sched-run:hover { color: var(--text); }
+.sched-run-done { color: #22c55e; }
+.sched-run-error { color: #ef4444; }
+.sched-run-running { color: #f59e0b; }
+.sched-run-err { color: #ef4444; font-size: 0.72rem; }
+.sched-run-empty { font-size: 0.76rem; color: var(--text-muted); }

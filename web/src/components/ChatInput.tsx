@@ -1,4 +1,19 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { SlashMenu, type SlashItem } from "./SlashMenu";
+
+// Minimal Web Speech API shapes (not in the default TS DOM lib).
+interface SpeechRecognitionResultEvent {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+}
+interface SpeechRecognitionInstance {
+  lang: string;
+  interimResults: boolean;
+  onresult: (e: SpeechRecognitionResultEvent) => void;
+  onerror: () => void;
+  onend: () => void;
+  start: () => void;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
 
 const TOOLS = [
   { label: "翻译", text: "请将以下内容翻译成英文：" },
@@ -17,6 +32,10 @@ export function ChatInput({
   onToggleSearch,
   canContinue,
   onContinue,
+  agentMode,
+  onToggleAgentMode,
+  token,
+  onSlashSelect,
 }: {
   onSend: (text: string, fileContent?: string) => void;
   onStop: () => void;
@@ -27,6 +46,10 @@ export function ChatInput({
   onToggleSearch: () => void;
   canContinue: boolean;
   onContinue: () => void;
+  agentMode: boolean;
+  onToggleAgentMode: () => void;
+  token: string | null;
+  onSlashSelect: (item: SlashItem) => void;
 }) {
   const [input, setInput] = useState("");
   const [fileName, setFileName] = useState("");
@@ -57,9 +80,9 @@ export function ChatInput({
     ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
   }, [input]);
 
-  // Show commands when typing /
+  // Show slash menu while typing a leading /command (no spaces yet)
   useEffect(() => {
-    setShowCommands(input.startsWith("/") && input.length <= 10);
+    setShowCommands(input.startsWith("/") && !input.includes(" "));
   }, [input]);
 
   const handleSend = useCallback(() => {
@@ -72,28 +95,36 @@ export function ChatInput({
   }, [input, streaming, onSend, fileContent]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !showCommands) {
-      e.preventDefault();
-      streaming ? onStop() : handleSend();
+    // When slash menu is open, let it handle arrows/enter/escape
+    if (showCommands && ["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) {
+      return;
     }
-    if (e.key === "Escape") setShowCommands(false);
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (streaming) onStop();
+      else handleSend();
+    }
   };
 
-  const execCommand = (cmd: string) => {
+  const handleSlashSelect = (item: SlashItem) => {
     setInput("");
     setShowCommands(false);
-    if (cmd === "/clear") onSend("请忽略对话历史，开始新话题。", undefined);
+    onSlashSelect(item);
   };
 
   const toggleVoice = () => {
-    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SpeechRecognition) { alert("浏览器不支持语音输入"); return; }
     if (listening) { setListening(false); return; }
 
-    const recognition = new (SpeechRecognition as any)();
+    const recognition = new SpeechRecognition();
     recognition.lang = "zh-CN";
     recognition.interimResults = false;
-    recognition.onresult = (e: any) => {
+    recognition.onresult = (e: SpeechRecognitionResultEvent) => {
       const text = e.results[0][0].transcript;
       setInput((prev) => prev + text);
       setListening(false);
@@ -140,12 +171,12 @@ export function ChatInput({
     <div className="chat-input-area">
       <div className="chat-input-box">
         {showCommands && (
-          <div className="commands-dropdown">
-            <div className="command-item" onClick={() => execCommand("/clear")}>
-              <span className="command-cmd">/clear</span>
-              <span className="command-desc">清除对话上下文</span>
-            </div>
-          </div>
+          <SlashMenu
+            query={input}
+            token={token}
+            onSelect={handleSlashSelect}
+            onClose={() => setShowCommands(false)}
+          />
         )}
         {fileName && (
           <div className="file-attachment">📎 {fileName}
@@ -167,6 +198,14 @@ export function ChatInput({
             </button>
             <button className={`btn-tool ${searchEnabled ? "btn-tool-active" : ""}`} onClick={onToggleSearch}
               title={searchEnabled ? "关闭联网搜索" : "开启联网搜索"}>🌐</button>
+            <button
+              className={`btn-tool btn-mode-toggle ${agentMode ? "btn-tool-active" : ""}`}
+              onClick={onToggleAgentMode}
+              title={agentMode ? "当前：Agent 模式（点击切换为 Chat 模式）" : "当前：Chat 模式（点击切换为 Agent 模式）"}
+              style={{ fontWeight: agentMode ? 700 : 400 }}
+            >
+              {agentMode ? "⚡ Agent" : "💬 Chat"}
+            </button>
           </div>
           <div className="toolbar-right">
             {canContinue && !streaming && (

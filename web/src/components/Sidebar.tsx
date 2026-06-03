@@ -87,6 +87,8 @@ export function Sidebar({
   userDisplayName,
   onSettingsClick,
   onLogout,
+  onMemoryClick,
+  onSchedulerClick,
 }: {
   conversations: Conversation[];
   activeId: string | null;
@@ -102,6 +104,8 @@ export function Sidebar({
   userDisplayName: string;
   onSettingsClick: () => void;
   onLogout: () => void;
+  onMemoryClick?: () => void;
+  onSchedulerClick?: () => void;
 }) {
   const { theme, toggleTheme } = useTheme();
 
@@ -149,6 +153,16 @@ export function Sidebar({
                 <span>{theme === "dark" ? "☀️" : "🌙"}</span>
                 <span>{theme === "dark" ? "浅色模式" : "深色模式"}</span>
               </div>
+              {onMemoryClick && (
+                <div className="sidebar-footer-item" onClick={onMemoryClick} role="button">
+                  <span>🧠</span><span>记忆</span>
+                </div>
+              )}
+              {onSchedulerClick && (
+                <div className="sidebar-footer-item" onClick={onSchedulerClick} role="button">
+                  <span>⏰</span><span>定时任务</span>
+                </div>
+              )}
               <div className="sidebar-footer-item" onClick={onSettingsClick} role="button">
                 <span>⚙️</span><span>设置</span>
               </div>
