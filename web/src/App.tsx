@@ -31,7 +31,7 @@ function loadSettings(): SettingsData {
   try {
     const raw = localStorage.getItem("user-settings");
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch { /* corrupt settings — fall back to defaults */ }
   return { avatar: null, displayName: "multifort", systemPrompt: "", apiKey: "", fontSize: 16 };
 }
 

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, type ReactNode } from "react";
+import { useRef, useEffect, useState, useId, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -15,10 +15,13 @@ mermaid.initialize({ startOnLoad: false, theme: "base", themeVariables: { darkMo
 function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState("");
-  const id = useRef(`mermaid-${Math.random().toString(36).slice(2)}`);
+  // useId is render-pure and stable; strip ':' so it's a valid mermaid/DOM id.
+  const rawId = useId();
+  const id = `mermaid-${rawId.replace(/:/g, "")}`;
 
   useEffect(() => {
-    mermaid.render(id.current, code).then(({ svg: s }) => setSvg(s)).catch(() => setSvg("<p style='color:#f87171'>图表渲染失败</p>"));
+    mermaid.render(id, code).then(({ svg: s }) => setSvg(s)).catch(() => setSvg("<p style='color:#f87171'>图表渲染失败</p>"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
   return <div ref={ref} className="mermaid-block" dangerouslySetInnerHTML={{ __html: svg }} />;

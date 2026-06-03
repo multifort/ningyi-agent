@@ -1,6 +1,20 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { SlashMenu, type SlashItem } from "./SlashMenu";
 
+// Minimal Web Speech API shapes (not in the default TS DOM lib).
+interface SpeechRecognitionResultEvent {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+}
+interface SpeechRecognitionInstance {
+  lang: string;
+  interimResults: boolean;
+  onresult: (e: SpeechRecognitionResultEvent) => void;
+  onerror: () => void;
+  onend: () => void;
+  start: () => void;
+}
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
+
 const TOOLS = [
   { label: "翻译", text: "请将以下内容翻译成英文：" },
   { label: "编程", text: "请用代码解决以下问题，并附上解释：" },
@@ -87,7 +101,8 @@ export function ChatInput({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      streaming ? onStop() : handleSend();
+      if (streaming) onStop();
+      else handleSend();
     }
   };
 
@@ -98,14 +113,18 @@ export function ChatInput({
   };
 
   const toggleVoice = () => {
-    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    const w = window as unknown as {
+      SpeechRecognition?: SpeechRecognitionCtor;
+      webkitSpeechRecognition?: SpeechRecognitionCtor;
+    };
+    const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SpeechRecognition) { alert("浏览器不支持语音输入"); return; }
     if (listening) { setListening(false); return; }
 
-    const recognition = new (SpeechRecognition as any)();
+    const recognition = new SpeechRecognition();
     recognition.lang = "zh-CN";
     recognition.interimResults = false;
-    recognition.onresult = (e: any) => {
+    recognition.onresult = (e: SpeechRecognitionResultEvent) => {
       const text = e.results[0][0].transcript;
       setInput((prev) => prev + text);
       setListening(false);
