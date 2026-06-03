@@ -102,7 +102,7 @@ function toolNameFromMarker(line: string): string {
  *   stdout → response text (+ ⚠ warning prefixes)
  *   stderr → session_id: XXXX
  */
-function parseQuietOutput(stdout: string, stderr: string): HermesResponse {
+export function parseQuietOutput(stdout: string, stderr: string): HermesResponse {
   const sessionId =
     (SESSION_RE.exec(stderr) ?? SESSION_RE.exec(stdout))?.[1] ?? "";
   const SKIP = ["  ⚠", "↻ Resumed", "session_id:"];
@@ -121,7 +121,7 @@ function parseQuietOutput(stdout: string, stderr: string): HermesResponse {
  *   ╭─ ⚕ Hermes ─╮ ... ╰─╯    → answer box (content = final text)
  *   hermes --resume <ID>       → session id
  */
-function parseVerboseOutput(stdout: string, stderr: string): HermesResponse {
+export function parseVerboseOutput(stdout: string, stderr: string): HermesResponse {
   const clean = stripAnsi(stdout);
   const lines = clean.split("\n");
 
