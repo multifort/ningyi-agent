@@ -4,7 +4,10 @@
 > 升级为「具备工具调用、技能体系、记忆管理、任务编排能力的完整 AI 助手」。
 >
 > 文档版本：v1.0  
-> 状态：待评审
+> 状态：**已实施**（2026-06-03）— Phase 1–7 全部完成。实现说明与偏差见
+> `docs/decisions/0003-hermes-integration-architecture.md` 与
+> `docs/architecture.md` 第九节。关键偏差：因 Hermes 仅提供 CLI（无 HTTP API），
+> 采用 subprocess 桥接；T2-3 多步进度条由实时工具调用卡片替代。
 
 ---
 
