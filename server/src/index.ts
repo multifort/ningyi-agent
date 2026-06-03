@@ -22,6 +22,7 @@ import conversationRoutes from "./conversations.js";
 import knowledgeRoutes from "./knowledge.js";
 import shareRoutes from "./share.js";
 import fetchUrlRoutes from "./fetch-url.js";
+import fileRoutes from "./files.js";
 import { authMiddleware } from "./middleware/auth.js";
 
 const PORT = parseInt(process.env.PORT ?? "8787", 10);
@@ -119,6 +120,7 @@ app.use("/api", authMiddleware, shareRoutes);
 app.use("/api", memoryRoutes);
 app.use("/api", skillRoutes);
 app.use("/api", schedulerRoutes);
+app.use("/api", fileRoutes);
 app.use(shareRoutes); // GET /share/:token is public
 
 app.post("/api/chat", authMiddleware, (req, res) => {

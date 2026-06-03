@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ToolCall } from "../types";
+import { DocumentPreview, extractFilePath } from "./DocumentPreview";
 
 const TOOL_ICONS: Record<string, string> = {
   bash: "💻",
@@ -25,8 +26,10 @@ function fmtDuration(ms?: number | null): string {
 
 export function ToolCallCard({ tool }: { tool: ToolCall }) {
   const [expanded, setExpanded] = useState(false);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
   const icon = TOOL_ICONS[tool.toolName] ?? TOOL_ICONS.tool;
   const label = TOOL_LABELS[tool.toolName] ?? tool.toolName;
+  const filePath = extractFilePath(tool.input);
 
   return (
     <div className={`tool-call-card tool-call-${tool.status}`}>
@@ -36,6 +39,15 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
         <span className="tool-call-input" title={tool.input}>
           {tool.input.length > 60 ? tool.input.slice(0, 60) + "…" : tool.input}
         </span>
+        {filePath && (
+          <button
+            className="tool-call-preview-btn"
+            title="预览文档"
+            onClick={(e) => { e.stopPropagation(); setPreviewPath(filePath); }}
+          >
+            👁 预览
+          </button>
+        )}
         <span className="tool-call-status">
           {tool.status === "running" && <span className="tool-call-spinner">⏳</span>}
           {tool.status === "done" && (
@@ -45,6 +57,9 @@ export function ToolCallCard({ tool }: { tool: ToolCall }) {
         </span>
         <span className="tool-call-chevron">{expanded ? "▾" : "▸"}</span>
       </div>
+      {previewPath && (
+        <DocumentPreview path={previewPath} onClose={() => setPreviewPath(null)} />
+      )}
       {expanded && (
         <div className="tool-call-body">
           <div className="tool-call-section">
