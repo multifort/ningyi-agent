@@ -17,6 +17,8 @@ import { randomUUID } from "node:crypto";
 import type { AuthRequest } from "./middleware/auth.js";
 import db from "./db.js";
 import { hermesStream, hermesHealth } from "./hermes-bridge.js";
+import { buildInjectText } from "./memory.js";
+import { extractAndSaveMemories } from "./memory-extract.js";
 
 function sendSSE(res: Response, event: string, data: unknown): void {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -102,6 +104,14 @@ export async function handleAgentChat(
     .get(conversationId) as { hermes_session: string } | undefined;
   const hermesSessionId = agentSession?.hermes_session;
 
+  // Inject persistent memory only on the first turn (no resume session yet).
+  // On resume, Hermes already carries the prior context.
+  let promptToSend = lastUser.content;
+  if (!hermesSessionId) {
+    const mem = buildInjectText(userId);
+    if (mem) promptToSend = `${mem}\n\n---\n\n${lastUser.content}`;
+  }
+
   // Set SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -121,7 +131,7 @@ export async function handleAgentChat(
 
   try {
     for await (const { event, data } of hermesStream(
-      lastUser.content,
+      promptToSend,
       hermesSessionId,
       { cwd: process.cwd() },
     )) {
@@ -189,6 +199,11 @@ export async function handleAgentChat(
 
     if (!res.writableEnded) {
       endSSE(res, "done", { conversationId, finished: true });
+    }
+
+    // Fire-and-forget memory extraction (never blocks the response)
+    if (fullContent) {
+      void extractAndSaveMemories(userId, lastUser.content, fullContent);
     }
   } else {
     if (!res.writableEnded) res.end();

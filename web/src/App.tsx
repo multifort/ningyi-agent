@@ -10,6 +10,7 @@ import { ChatInput } from "./components/ChatInput";
 import { Sidebar } from "./components/Sidebar";
 import { Settings } from "./components/Settings";
 import type { SettingsData } from "./components/Settings";
+import { MemoryPanel } from "./components/MemoryPanel";
 import { LoginPage, RegisterPage } from "./components/AuthPages";
 import { useAuth, fetchApi } from "./components/AuthProvider";
 import {
@@ -53,6 +54,7 @@ export default function App() {
   const [userSettings, setUserSettings] =
     useState<SettingsData>(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [agentMode, setAgentMode] = useState<boolean>(() => {
     try { return localStorage.getItem("agent-mode") === "true"; } catch { return false; }
@@ -309,6 +311,7 @@ export default function App() {
         userDisplayName={user.displayName}
         onSettingsClick={() => setSettingsOpen(true)}
         onLogout={logout}
+        onMemoryClick={() => setMemoryOpen(true)}
       />
 
       <main className="main-area">
@@ -350,6 +353,10 @@ export default function App() {
           onToggleAgentMode={handleToggleAgentMode}
         />
       </main>
+
+      {memoryOpen && token && (
+        <MemoryPanel token={token} onClose={() => setMemoryOpen(false)} />
+      )}
 
       {settingsOpen && (
         <Settings
