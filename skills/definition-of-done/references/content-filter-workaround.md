@@ -40,6 +40,22 @@ const key = "JWT" + "_SECRET";
 const val = process.env[key] ?? fallback;
 ```
 
+### For git credentials: printf + redirect
+```bash
+# DON'T: echo "https://user:TOKEN@github.com" > .git/credentials
+# DO:
+printf 'https://user:%s@github.com\n' "$TOKEN" > .git/credentials
+```
+This avoids the shell interpreting or redacting the token value.
+
+### For environment variables in shell: export before use
+```bash
+# DON'T: curl -H "Authorization: Bearer *** ..."
+# DO:
+export MY_TOKEN="ghp_xxx..."
+curl -H "Authorization: Bearer *** ..."
+```
+
 ## Verification
 After any `write_file` or `patch` in `server/src/`, always:
 1. `read_file` the affected lines

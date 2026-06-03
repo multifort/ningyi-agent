@@ -28,7 +28,8 @@ Run through every item. If one fails, the change is NOT done.
 ## Pitfalls
 - **Content filter**: `write_file` and `patch` can mangle strings like `process.env.XXX` or `"7d"`. See `references/content-filter-workaround.md` for workarounds.
 - **Stale background processes**: `npm --prefix server run dev` with `background=true` leaves orphan tsx processes that spam notifications. Before restarting the backend, kill existing: `kill $(lsof -t -i :8787) 2>/dev/null`.
-- **GitHub push hangs**: If `git push origin main` hangs with credential helper, use direct URL: `GIT_TERMINAL_PROMPT=0 git push "https://user:token@github.com/owner/repo.git" main`.
+- **GitHub push hangs**: If `git push origin main` hangs with credential helper, clear helper first: `git config --local credential.helper ""`, then use direct URL with `GIT_TERMINAL_PROMPT=0`. If still hanging, unset proxy env vars: `env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY git push ...`.
+- **JWT auth 401**: When tokens work on login but fail on protected routes, check that the token ISSUER and VERIFIER use the SAME JWT_SECRET. In Express projects with separate `auth.ts` (issue) and `middleware/auth.ts` (verify), mismatched defaults (`"secret-a"` vs `"secret-b"`) silently break all authenticated requests. See `references/jwt-auth-pitfalls.md`.
 - Marking done with skipped/xfail tests left silently in place.
 - "I'll update docs later" — later never comes; do it in the same change.
 - Bundling unrelated refactors into the diff.
@@ -43,4 +44,5 @@ Run through every item. If one fails, the change is NOT done.
 - `references/express5-sse-quirks.md` — Express 5 SSE streaming pitfalls and fixes
 - `references/vite-cors-theming.md` — Vite host binding, CORS, and CSS theming patterns
 - `references/content-filter-workaround.md` — write_file/patch string mangling workarounds
+- `references/jwt-auth-pitfalls.md` — JWT_SECRET mismatch, 401 debugging patterns
 - `references/ui-patterns.md` — DeepSeek风格 + 元宝式输入框 + 登录动画 UI 设计模式
