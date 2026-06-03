@@ -1244,3 +1244,15 @@ body {
 .slash-item-active { background: rgba(77,107,254,0.15); }
 .slash-cmd { font-family: ui-monospace, monospace; font-weight: 600; color: var(--accent); white-space: nowrap; }
 .slash-desc { font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Scheduler panel extras ─────────────────── */
+.sched-meta { font-size: 0.74rem; color: var(--text-muted); margin: 3px 0 5px; }
+.sched-meta code { background: rgba(0,0,0,0.25); padding: 1px 6px; border-radius: 4px; }
+.sched-runs { margin-top: 8px; border-top: 1px solid var(--border, rgba(255,255,255,0.08)); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.sched-run { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; color: var(--text-muted); cursor: pointer; padding: 2px 0; }
+.sched-run:hover { color: var(--text); }
+.sched-run-done { color: #22c55e; }
+.sched-run-error { color: #ef4444; }
+.sched-run-running { color: #f59e0b; }
+.sched-run-err { color: #ef4444; font-size: 0.72rem; }
+.sched-run-empty { font-size: 0.76rem; color: var(--text-muted); }

@@ -11,6 +11,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Settings } from "./components/Settings";
 import type { SettingsData } from "./components/Settings";
 import { MemoryPanel } from "./components/MemoryPanel";
+import { SchedulerPanel } from "./components/SchedulerPanel";
 import { LoginPage, RegisterPage } from "./components/AuthPages";
 import { useAuth, fetchApi } from "./components/AuthProvider";
 import {
@@ -55,6 +56,7 @@ export default function App() {
     useState<SettingsData>(loadSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [schedulerOpen, setSchedulerOpen] = useState(false);
   const [searchEnabled, setSearchEnabled] = useState(false);
   const [agentMode, setAgentMode] = useState<boolean>(() => {
     try { return localStorage.getItem("agent-mode") === "true"; } catch { return false; }
@@ -387,6 +389,7 @@ export default function App() {
         onSettingsClick={() => setSettingsOpen(true)}
         onLogout={logout}
         onMemoryClick={() => setMemoryOpen(true)}
+        onSchedulerClick={() => setSchedulerOpen(true)}
       />
 
       <main className="main-area">
@@ -433,6 +436,20 @@ export default function App() {
 
       {memoryOpen && token && (
         <MemoryPanel token={token} onClose={() => setMemoryOpen(false)} />
+      )}
+
+      {schedulerOpen && token && (
+        <SchedulerPanel
+          token={token}
+          onClose={() => setSchedulerOpen(false)}
+          onOpenConversation={(id) => {
+            setSchedulerOpen(false);
+            fetchApi("/conversations", {}, token).then((data) => {
+              dispatch({ type: "LOAD_CONVERSATIONS", conversations: data.conversations });
+              dispatch({ type: "SET_ACTIVE_CONVERSATION", id });
+            }).catch(() => {});
+          }}
+        />
       )}
 
       {settingsOpen && (
