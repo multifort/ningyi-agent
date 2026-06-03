@@ -106,7 +106,8 @@ export default function App() {
   }, [activeId, token]);
 
   const doStream = useCallback(
-    (apiMessages: { role: string; content: string }[], convId?: string) => {
+    (apiMessages: { role: string; content: string }[], convId?: string, forceChat = false) => {
+      const useAgent = agentMode && !forceChat;
       const assistantMsg: Message = {
         id: genMsgId(),
         role: "assistant",
@@ -137,9 +138,17 @@ export default function App() {
               ).catch(() => {});
             }
           },
-          onError: (message) => dispatch({ type: "SET_ERROR", error: message }),
+          onError: (message, fallback) => {
+            // Graceful degradation: Hermes offline → auto-retry in Chat mode
+            if (fallback && useAgent) {
+              dispatch({ type: "SET_ERROR", error: "Hermes Agent 不可用，已自动切换为 Chat 模式" });
+              doStream(apiMessages, convId, true);
+              return;
+            }
+            dispatch({ type: "SET_ERROR", error: message });
+          },
         },
-        agentMode,
+        useAgent,
       );
     },
     [activeId, token, agentMode],
@@ -501,7 +510,7 @@ function streamChatAuth(
     onToolStart?: (stepId: number, toolName: string, input: string) => void;
     onToolEnd?: (stepId: number, output: string, durationMs: number | null) => void;
     onDone: (conversationId?: string) => void;
-    onError: (message: string) => void;
+    onError: (message: string, fallback?: boolean) => void;
   },
   agentMode = false,
 ): AbortController {
@@ -563,7 +572,7 @@ function streamChatAuth(
             } else if (data.finished !== undefined) {
               callbacks.onDone(data.conversationId);
             } else if (data.message) {
-              callbacks.onError(data.message);
+              callbacks.onError(data.message, data.fallback);
             }
             eventType = "";
           } catch { /* skip */ }
