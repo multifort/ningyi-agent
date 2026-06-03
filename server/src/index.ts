@@ -15,6 +15,7 @@ import { handleChat } from "./chat.js";
 import { handleAgentChat } from "./agent-chat.js";
 import { hermesHealth } from "./hermes-bridge.js";
 import memoryRoutes from "./memory.js";
+import skillRoutes from "./skills.js";
 import authRoutes from "./auth.js";
 import conversationRoutes from "./conversations.js";
 import knowledgeRoutes from "./knowledge.js";
@@ -115,6 +116,7 @@ app.use("/api", authMiddleware, knowledgeRoutes);
 app.use("/api", authMiddleware, fetchUrlRoutes);
 app.use("/api", authMiddleware, shareRoutes);
 app.use("/api", memoryRoutes);
+app.use("/api", skillRoutes);
 app.use(shareRoutes); // GET /share/:token is public
 
 app.post("/api/chat", authMiddleware, (req, res) => {

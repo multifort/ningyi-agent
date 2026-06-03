@@ -1209,3 +1209,38 @@ body {
 .memory-btn { font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border, rgba(255,255,255,0.12)); background: transparent; color: var(--text-muted); cursor: pointer; }
 .memory-btn-danger { color: #ef4444; }
 .memory-content { font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; white-space: pre-wrap; }
+
+/* ── Slash command menu ─────────────────────── */
+.slash-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elevated, #1c1c1f);
+  border: 1px solid var(--border, rgba(255,255,255,0.1));
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  padding: 6px;
+  z-index: 50;
+}
+.slash-group {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 6px 10px 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.slash-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.slash-item-active { background: rgba(77,107,254,0.15); }
+.slash-cmd { font-family: ui-monospace, monospace; font-weight: 600; color: var(--accent); white-space: nowrap; }
+.slash-desc { font-size: 0.8rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

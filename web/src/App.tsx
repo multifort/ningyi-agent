@@ -273,6 +273,81 @@ export default function App() {
     dispatch({ type: "FORK_CONVERSATION", conversationId: activeId });
   }, [activeId]);
 
+  // Invoke a Hermes skill via SSE, rendering output as an assistant message.
+  const invokeSkill = useCallback(
+    (skillName: string, input: string) => {
+      if (!token) return;
+      const userMsg: Message = { id: genMsgId(), role: "user", content: `/${skillName} ${input}` };
+      const assistantMsg: Message = { id: genMsgId(), role: "assistant", content: "" };
+      dispatch({ type: "ADD_MESSAGE", message: userMsg });
+      dispatch({ type: "ADD_MESSAGE", message: assistantMsg });
+      dispatch({ type: "SET_STREAMING", streaming: true });
+      dispatch({ type: "SET_ERROR", error: null });
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+      (async () => {
+        try {
+          const resp = await fetch(`/api/skills/${encodeURIComponent(skillName)}/invoke`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ input, conversationId: activeId ?? undefined }),
+            signal: controller.signal,
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const reader = resp.body!.getReader();
+          const dec = new TextDecoder();
+          let buf = "", evt = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) {
+              if (line.startsWith("event: ")) { evt = line.slice(7).trim(); continue; }
+              if (!line.startsWith("data: ")) continue;
+              try {
+                const d = JSON.parse(line.slice(6));
+                if (evt === "token" && d.content) dispatch({ type: "APPEND_TOKEN", messageId: assistantMsg.id, token: d.content });
+                else if (evt === "tool_start") dispatch({ type: "TOOL_START", messageId: assistantMsg.id, stepId: d.stepId, toolName: d.toolName, input: d.input ?? "" });
+                else if (evt === "tool_end") dispatch({ type: "TOOL_END", messageId: assistantMsg.id, stepId: d.stepId, output: d.output, durationMs: d.durationMs });
+                else if (evt === "error" && d.message) dispatch({ type: "SET_ERROR", error: d.message });
+                evt = "";
+              } catch { /* skip */ }
+            }
+          }
+        } catch (err) {
+          if (!(err instanceof DOMException && err.name === "AbortError")) {
+            dispatch({ type: "SET_ERROR", error: err instanceof Error ? err.message : "技能执行失败" });
+          }
+        } finally {
+          dispatch({ type: "SET_STREAMING", streaming: false });
+        }
+      })();
+    },
+    [token, activeId],
+  );
+
+  const handleSlashSelect = useCallback(
+    (item: { cmd: string; kind: string; skillName?: string }) => {
+      if (item.kind === "builtin") {
+        if (item.cmd === "/new") handleNewChat();
+        else if (item.cmd === "/clear") handleClearChat();
+        else if (item.cmd === "/export" && activeId) window.open(`/api/conversations/${activeId}/export`, "_blank");
+        else if (item.cmd === "/share" && activeId) {
+          fetchApi(`/conversations/${activeId}/share`, { method: "POST" }, token!)
+            .then((r) => { navigator.clipboard.writeText(window.location.origin + r.url); alert("分享链接已复制！"); })
+            .catch(() => alert("分享失败"));
+        }
+      } else if (item.kind === "skill" && item.skillName) {
+        const input = prompt(`为技能「${item.skillName}」输入内容：`);
+        if (input?.trim()) invokeSkill(item.skillName, input.trim());
+      }
+    },
+    [activeId, token, handleNewChat, handleClearChat, invokeSkill],
+  );
+
   // Auth loading
   if (authLoading) {
     return (
@@ -351,6 +426,8 @@ export default function App() {
           onContinue={handleContinue}
           agentMode={agentMode}
           onToggleAgentMode={handleToggleAgentMode}
+          token={token}
+          onSlashSelect={handleSlashSelect}
         />
       </main>
 

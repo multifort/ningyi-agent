@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { SlashMenu, type SlashItem } from "./SlashMenu";
 
 const TOOLS = [
   { label: "翻译", text: "请将以下内容翻译成英文：" },
@@ -19,6 +20,8 @@ export function ChatInput({
   onContinue,
   agentMode,
   onToggleAgentMode,
+  token,
+  onSlashSelect,
 }: {
   onSend: (text: string, fileContent?: string) => void;
   onStop: () => void;
@@ -31,6 +34,8 @@ export function ChatInput({
   onContinue: () => void;
   agentMode: boolean;
   onToggleAgentMode: () => void;
+  token: string | null;
+  onSlashSelect: (item: SlashItem) => void;
 }) {
   const [input, setInput] = useState("");
   const [fileName, setFileName] = useState("");
@@ -61,9 +66,9 @@ export function ChatInput({
     ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
   }, [input]);
 
-  // Show commands when typing /
+  // Show slash menu while typing a leading /command (no spaces yet)
   useEffect(() => {
-    setShowCommands(input.startsWith("/") && input.length <= 10);
+    setShowCommands(input.startsWith("/") && !input.includes(" "));
   }, [input]);
 
   const handleSend = useCallback(() => {
@@ -76,17 +81,20 @@ export function ChatInput({
   }, [input, streaming, onSend, fileContent]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey && !showCommands) {
+    // When slash menu is open, let it handle arrows/enter/escape
+    if (showCommands && ["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) {
+      return;
+    }
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       streaming ? onStop() : handleSend();
     }
-    if (e.key === "Escape") setShowCommands(false);
   };
 
-  const execCommand = (cmd: string) => {
+  const handleSlashSelect = (item: SlashItem) => {
     setInput("");
     setShowCommands(false);
-    if (cmd === "/clear") onSend("请忽略对话历史，开始新话题。", undefined);
+    onSlashSelect(item);
   };
 
   const toggleVoice = () => {
@@ -144,12 +152,12 @@ export function ChatInput({
     <div className="chat-input-area">
       <div className="chat-input-box">
         {showCommands && (
-          <div className="commands-dropdown">
-            <div className="command-item" onClick={() => execCommand("/clear")}>
-              <span className="command-cmd">/clear</span>
-              <span className="command-desc">清除对话上下文</span>
-            </div>
-          </div>
+          <SlashMenu
+            query={input}
+            token={token}
+            onSelect={handleSlashSelect}
+            onClose={() => setShowCommands(false)}
+          />
         )}
         {fileName && (
           <div className="file-attachment">📎 {fileName}

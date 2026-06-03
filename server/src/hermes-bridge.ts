@@ -37,6 +37,8 @@ export interface HermesBridgeOptions {
   cwd?: string;
   /** Capture tool-call activity (runs verbose). Defaults to true. */
   verbose?: boolean;
+  /** Skills to preload for this call (hermes -s). */
+  skills?: string[];
 }
 
 const DEFAULT_OPTIONS: Required<HermesBridgeOptions> = {
@@ -45,6 +47,7 @@ const DEFAULT_OPTIONS: Required<HermesBridgeOptions> = {
   timeoutMs: 120_000,
   cwd: process.cwd(),
   verbose: true,
+  skills: [],
 };
 
 // ── Health check ────────────────────────────────
@@ -194,6 +197,7 @@ export async function hermesSend(
   const args = ["chat", "-q", prompt, "--max-turns", String(opts.maxTurns)];
   if (!opts.verbose) args.push("-Q");
   if (sessionId) args.push("--resume", sessionId);
+  for (const skill of opts.skills) args.push("-s", skill);
 
   return new Promise((resolve, reject) => {
     let stdout = "";
