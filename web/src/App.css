@@ -675,14 +675,32 @@ body {
 }
 
 .btn-tool-stop {
+  width: auto;
+  padding: 0 12px;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: 999px;
+}
+.btn-tool-stop:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
 
 .btn-tool-continue {
-  color: var(--accent);
-  padding: 0 10px;
   width: auto;
+  padding: 0 12px;
+  gap: 4px;
+  white-space: nowrap;
   font-size: 0.78rem;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: 999px;
+}
+.btn-tool-continue:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 .file-attachment {
