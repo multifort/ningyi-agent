@@ -616,7 +616,7 @@ body {
 .toolbar-right {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .tool-select {
@@ -1168,7 +1168,23 @@ body {
 }
 
 /* ── Agent mode toggle button ───────────────── */
-.btn-mode-toggle { white-space: nowrap; }
+/* Labeled pill — overrides the fixed 30px square of .btn-tool. */
+.btn-mode-toggle {
+  width: auto;
+  height: 30px;
+  padding: 0 12px;
+  margin-left: 6px;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid var(--border, rgba(127, 127, 127, 0.25));
+  border-radius: 999px;
+}
+.btn-mode-toggle.btn-tool-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
 
 /* ── Side panels (Memory / Scheduler) ───────── */
 .panel-overlay {
