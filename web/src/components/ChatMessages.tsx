@@ -74,6 +74,13 @@ function ChatMessage({
 }) {
   const isUser = message.role === "user";
   const isEmpty = message.content.trim().length === 0;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <div className={`msg ${isUser ? "msg-user" : "msg-assistant"}`}>
@@ -128,24 +135,30 @@ function ChatMessage({
         </div>
         {!isEmpty && (
           <div className="msg-actions">
+            <button
+              className={`msg-action-icon${copied ? " is-active" : ""}`}
+              onClick={handleCopy}
+              title="复制"
+            >
+              {copied ? "✓" : "⎘"}
+            </button>
             {isUser ? (
-              <>
-                <button className="msg-action" onClick={() => navigator.clipboard.writeText(message.content)} title="复制">
-                  📋 复制
-                </button>
-                <button className="msg-action" onClick={() => onEdit?.(message.content)} title="重新编辑">
-                  ✏️ 编辑
-                </button>
-              </>
+              <button
+                className="msg-action-icon"
+                onClick={() => onEdit?.(message.content)}
+                title="编辑"
+              >
+                ✎
+              </button>
             ) : (
-              <>
-                <button className="msg-action" onClick={() => navigator.clipboard.writeText(message.content)} title="复制">
-                  📋 复制
-                </button>
-                <button className="msg-action" onClick={() => onRegenerateMsg?.(message.id)} disabled={streaming} title="重新生成">
-                  🔄 重新生成
-                </button>
-              </>
+              <button
+                className="msg-action-icon"
+                onClick={() => onRegenerateMsg?.(message.id)}
+                disabled={streaming}
+                title="重新生成"
+              >
+                ↻
+              </button>
             )}
           </div>
         )}

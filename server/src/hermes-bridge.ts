@@ -290,11 +290,14 @@ export async function* hermesStream(
     return;
   }
 
-  // Simulate typing with ~4-char chunks
+  // Simulate typing with ~4-char chunks. A real (small) delay between chunks
+  // is required so they flush as separate network packets — otherwise TCP
+  // coalesces them and the client receives everything in one read (which makes
+  // the response look non-streaming, especially on React Native's fetch).
   const CHUNK = 4;
   for (let i = 0; i < text.length; i += CHUNK) {
     yield { event: "token", data: { content: text.slice(i, i + CHUNK) } };
-    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setTimeout(r, 18));
   }
 
   yield {
